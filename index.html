@@ -1,0 +1,1134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vroum</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout : cadran à gauche, commandes à droite (empilés sur téléphone).
+   Ce qui sert en roulant (démarrer, moteur, volume) est en haut ; le réglage des enregistrements est replié.
+   Thème sombre unique : écran de voiture, souvent de nuit. */
+:root{
+  --bg:#0f1216;        /* fond habitacle, gris bleuté */
+  --panel:#171b21;     /* blocs de commandes */
+  --sunk:#0b0d10;      /* champs de saisie */
+  --line:#2a313b;      /* bordures discrètes */
+  --fg:#ece9e2;        /* texte principal, blanc chaud */
+  --muted:#939ba6;     /* libellés (5.9:1 sur --panel) */
+  --amber:#f2a541;     /* rétroéclairage du compteur, action principale */
+  --amber-soft:#f2a54117;
+  --red:#ef5a5f;       /* zone rouge, erreurs */
+  --red-soft:#ef5a5f1f;
+  --green:#4cc38a;     /* état OK */
+  --f-digit:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:12px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+html{scrollbar-color:var(--line) var(--bg)}
+body{
+  background:var(--bg);color:var(--fg);font:16px/1.45 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+::selection{background:var(--amber);color:var(--bg)}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.app{max-width:1440px;margin:0 auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:grid;
+  grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:16px 28px;min-height:100%}
+header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{font:700 32px/1 var(--f-digit);letter-spacing:.08em;text-transform:uppercase;margin:0}
+h1 span{color:var(--amber)}
+
+/* Cadran + état */
+.instruments{min-width:0;display:flex;flex-direction:column;align-items:center;gap:14px}
+canvas{width:100%;max-width:620px;aspect-ratio:1/1;display:block}
+.status{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:500;color:var(--fg);
+  background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px}
+.pill::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.pill.ok::before{background:var(--green)} .pill.warn::before{background:var(--amber)} .pill.err::before{background:var(--red)}
+.alert{width:100%;max-width:620px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--red-soft);border:1px solid var(--red);border-radius:var(--r);padding:12px 14px}
+.alert p{margin:0;flex:1 1 260px;min-width:0;font-size:15px}
+.alert button{border-color:var(--red)}
+
+/* Commandes */
+.controls{display:flex;flex-direction:column;gap:14px;min-width:0}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+fieldset.block{display:block}
+fieldset.block>legend{float:left;width:100%;margin-bottom:12px}
+fieldset.block>legend+*{clear:both}
+fieldset.block>*+*{margin-top:12px}
+.label{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0}
+button,.file{font:600 16px var(--f-body);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:10px;
+  padding:12px 14px;cursor:pointer;min-height:52px;transition:background-color .15s,border-color .15s,color .15s}
+button:hover:not(:disabled),.file:hover{border-color:var(--muted)}
+button:active:not(:disabled){background:var(--amber-soft)}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.sel[aria-pressed="true"]{border-color:var(--amber);color:var(--amber);background:var(--amber-soft)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{border-color:transparent;min-height:46px;padding:8px 18px}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chips button{text-align:left;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;line-height:1.2}
+.chips button small{font-size:13px;font-weight:500;color:var(--muted)}
+.chips button[aria-pressed="true"] small{color:inherit;opacity:.8}
+.group{font-size:14px;font-weight:600;color:var(--fg)}
+.credits{font-size:13px;color:var(--muted);margin:0;max-width:70ch}
+.credits a{color:var(--muted);text-underline-offset:3px}
+.src{font-size:14px;color:var(--muted);margin:0}
+.src.real{color:var(--green)}
+
+.start{font:700 24px var(--f-digit);letter-spacing:.14em;text-transform:uppercase;min-height:80px;border:2px solid var(--amber);color:var(--amber)}
+.start.on{background:var(--amber);color:var(--bg)}
+.start.on:active{background:#d98f2e}
+
+.pedals{display:grid;grid-template-columns:1fr 1.5fr;gap:10px}
+.pedal{min-height:120px;font:700 22px var(--f-digit);letter-spacing:.12em;text-transform:uppercase;touch-action:none}
+.pedal.gas[aria-pressed="true"]{background:var(--amber);color:var(--bg);border-color:var(--amber)}
+.pedal.brake[aria-pressed="true"]{background:var(--red);color:var(--bg);border-color:var(--red)}
+.hint{font-size:14px;color:var(--muted);margin:0;max-width:62ch}
+.vol{display:flex;align-items:center;gap:14px}
+input[type=range]{flex:1;min-width:0;accent-color:var(--amber);height:44px;margin:0}
+.vol output{font:700 22px var(--f-digit);min-width:3ch;text-align:right;font-variant-numeric:tabular-nums}
+
+/* Enregistrements (réglage, replié par défaut) */
+details.block{gap:0}
+details[open].block{gap:14px}
+summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px;font-weight:600}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-3px);transition:transform .2s;flex:none}
+details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
+.sum{flex:1;min-width:0}
+.count{font-size:14px;font-weight:500;color:var(--muted);flex:none}
+.count.on{color:var(--green)}
+.rec{display:grid;grid-template-columns:9.5em 7em auto minmax(0,1fr);align-items:center;gap:10px}
+.file{display:flex;align-items:center;white-space:nowrap}
+.file:focus-within{outline:2px solid var(--amber);outline-offset:2px}
+.file input{position:absolute;width:1px;height:1px;opacity:0}
+.rec input[type=number]{font:700 20px var(--f-digit);font-variant-numeric:tabular-nums;color:var(--fg);background:var(--sunk);
+  border:1px solid var(--line);border-radius:8px;padding:10px;width:100%;min-height:52px;-webkit-user-select:text;user-select:text;caret-color:var(--amber)}
+.rec input[type=number]:invalid{border-color:var(--red)}
+.unit{font-size:14px;color:var(--muted)}
+.fname{font-size:14px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fname.on{color:var(--green)} .fname.err{color:var(--red)}
+
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  canvas{max-width:440px}
+}
+@media (max-width:480px){
+  .rec{grid-template-columns:9em 6.5em auto}.fname{grid-column:1/-1}
+  .pedal{min-height:100px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Vro<span>u</span>m</h1>
+    <div class="seg" role="group" aria-label="Mode">
+      <button type="button" class="sel" id="modeGps" aria-pressed="true">En roulant</button>
+      <button type="button" class="sel" id="modeTest" aria-pressed="false">Essai</button>
+    </div>
+  </header>
+
+  <section class="instruments" aria-label="Instruments">
+    <canvas id="tach" width="620" height="620" role="img" aria-label="Compte-tours et vitesse"></canvas>
+    <div class="status" aria-live="polite">
+      <span class="pill" id="gpsStatus">GPS éteint</span>
+      <span class="pill" id="audioStatus">Moteur coupé</span>
+    </div>
+    <div class="alert" id="alert" role="alert" hidden>
+      <p id="alertText"></p>
+      <button type="button" id="alertBtn" hidden></button>
+    </div>
+  </section>
+
+  <section class="controls" aria-label="Commandes">
+    <button id="startBtn" class="start" type="button">Démarrer le moteur</button>
+
+    <fieldset class="block">
+      <legend class="label">Voiture</legend>
+      <div class="group">Sons réels</div>
+      <div class="chips" id="cars"></div>
+      <div class="group">Synthèse</div>
+      <div class="chips" id="engines"></div>
+      <p class="src" id="srcHint">Son de synthèse</p>
+      <p class="credits">Sons réels : <a href="https://github.com/markeasting/engine-audio" target="_blank" rel="noopener">markeasting/engine-audio</a> (licence MIT) · Streiter V12 du jeu Street Shift, via <a href="https://github.com/ATG-Simulator/VehicleNoiseSynthesizer" target="_blank" rel="noopener">ATG Vehicle Noise Synthesizer</a> (licence MIT).</p>
+    </fieldset>
+
+    <div class="block">
+      <div class="pedals">
+        <button type="button" class="pedal brake" id="brakeBtn" aria-pressed="false">Frein</button>
+        <button type="button" class="pedal gas" id="gasBtn" aria-pressed="false">Gaz</button>
+      </div>
+      <p class="hint" id="modeHint"></p>
+      <div class="vol">
+        <label class="label" for="vol">Volume</label>
+        <input type="range" id="vol" min="0" max="100" value="70">
+        <output id="volOut" for="vol">70</output>
+      </div>
+    </div>
+
+    <details class="block" id="recBlock">
+      <summary><span class="sum">Vrais enregistrements · <span id="recEngine">V8 américain</span></span><span class="count" id="recCount">aucun</span></summary>
+      <p class="hint">Un enregistrement de ce moteur à régime stable, 5 à 10 secondes sans passage de rapport, avec le régime auquel il a été pris. Il remplace la synthèse et suit ton régime. Avec deux enregistrements, le son glisse de l'un à l'autre en montant dans les tours.</p>
+      <div class="rec">
+        <label class="file">Bas régime<input type="file" id="recLow" accept="audio/*"></label>
+        <input type="number" id="rpmLow" inputmode="numeric" min="300" max="20000" step="50" required aria-label="Régime de l'enregistrement bas régime">
+        <span class="unit">tr/min</span>
+        <span class="fname" id="nameLow">aucun fichier</span>
+      </div>
+      <div class="rec">
+        <label class="file">Haut régime<input type="file" id="recHigh" accept="audio/*"></label>
+        <input type="number" id="rpmHigh" inputmode="numeric" min="300" max="20000" step="50" required aria-label="Régime de l'enregistrement haut régime">
+        <span class="unit">tr/min</span>
+        <span class="fname" id="nameHigh">aucun fichier</span>
+      </div>
+      <button type="button" id="recClear">Supprimer les enregistrements de ce moteur</button>
+    </details>
+  </section>
+</div>
+
+<script>
+/* =========================================================
+   Profils moteur
+   gears   : km/h pour 1000 tr/min sur chaque rapport
+   orders  : signature tonale en ordres moteur [ordre, amplitude au ralenti, amplitude en haut]
+             ordre 1 = fréquence vilebrequin ; l'ordre d'allumage = cylindres / 2 domine toujours
+             - V8 croisé : ordre 4 + demi-ordres (0.5, 1.5, 2.5) dus aux allumages irréguliers par rangée -> glouglou
+             - V12 : ordre 6 très pur + ordres 3 (chaque rangée = un 6 cylindres en ligne) et 12 qui monte -> hurlement
+             - Flat-six : ordre 3 + 1.5 et 4.5 -> son rauque et métallique
+             - 4 cylindres : ordre 2 dominant + ordre 4
+   rough   : fluctuation des ordres (vie du son)   tgain : niveau de la partie tonale
+   mixP    : part de la texture "impulsions"      order : rangée de chaque allumage (0 gauche, 1 droite, 2 les deux)
+   width/attack/decay/rasp/jitter/imbalance : forme et irrégularité des impulsions d'échappement
+   pipe/fb : tube d'échappement (ms, résonance)   peaks : silencieux [fréquence, gain dB, Q]
+   ========================================================= */
+const ENGINES = {
+  /* ---------- Voitures réelles : vrais enregistrements ----------
+     type "layers" : 4 boucles (en charge / hors charge × bas / haut régime), fondu bas->haut entre xfade[0] et xfade[1] tr/min,
+                     hauteur décalée de pitch cents par tr/min autour du régime de chaque boucle
+     type "multi"  : une boucle par régime (moteur + échappement), on joue les deux plus proches et on ajuste la hauteur
+     vol : gain de chaque boucle, mesuré pour que toutes les voitures sonnent au même niveau */
+  f458: {name:"Ferrari 458", arch:"V8 4.5 atmo", idle:1000, redline:9000, gears:[8.3,11.9,15.7,20,24.4,29.8,36], pops:true,
+         real:{type:"layers", dir:"audio/458/", xfade:[3000,6500], pitch:.2,
+               layers:{on_low:{rpm:5300,vol:1.33}, on_high:{rpm:7700,vol:1.43}, off_low:{rpm:6900,vol:.6}, off_high:{rpm:7900,vol:.71}},
+               limiter:{file:"limiter",vol:1.06}}},
+  procar:{name:"BMW M1 Procar", arch:"6 en ligne 3.5 atmo", idle:1000, redline:9000, gears:[9,13.5,18.5,23.5,29], pops:true,
+         real:{type:"layers", dir:"audio/procar/", xfade:[3000,6500], pitch:.2,
+               layers:{on_low:{rpm:3200,vol:1.27}, on_high:{rpm:8000,vol:.76}, off_low:{rpm:3400,vol:2}, off_high:{rpm:8430,vol:.81}},
+               limiter:{file:"../bac/limiter",vol:.4}}},
+  bac:  {name:"BAC Mono", arch:"4 cyl. 2.5 atmo", idle:1000, redline:9000, gears:[8,11.5,15,19,23.5,28.5], pops:true,
+         real:{type:"layers", dir:"audio/bac/", xfade:[3000,6500], pitch:.2,
+               layers:{on_low:{rpm:1000,vol:.42}, on_high:{rpm:1000,vol:.335}, off_low:{rpm:1000,vol:.25}, off_high:{rpm:1000,vol:.21}},
+               limiter:{file:"limiter",vol:.4}}},
+  sv12: {name:"Streiter V12", arch:"V12, 32 boucles", idle:1150, redline:8800, gears:[9,14,19.5,25,31,37], pops:true,
+         real:{type:"multi", dir:"audio/v12/",
+               sets:{eng:{rpms:[1169,1520,2080,2632,3169,3752,4403,4978,5365,5768,6284,6822,7347,7880,8752], vol:.41},
+                     exh:{rpms:[1144,2258,2708,3298,3848,4498,4858,5443,5934,6422,6876,7519,8116,8909], vol:.71}}}},
+  /* ---------- Synthèse ---------- */
+  v8:  {name:"V8 américain", cyl:8, idle:700, redline:6500, gears:[12,20,29,38,48,60],
+        orders:[[.5,.3,.1],[1,.35,.15],[1.5,.32,.12],[2,.6,.4],[2.5,.22,.1],[3,.25,.15],[4,1,1],[6,.12,.25],[8,.22,.45],[12,.04,.15]],
+        rough:.5, tgain:.12, mixP:.45,
+        order:[0,1,1,0,1,0,0,1], width:.32, attack:9, decay:3.2, rasp:.06, jitter:.22, intake:.05, imbalance:.28, gain:.6,
+        pipe:9, fb:.22, peaks:[[65,9,.9],[380,-3,1],[1800,-9,.8]], drive:1.6,
+        cutBase:170, cutRange:1500, cutLoad:800, pops:true},
+  v12: {name:"V12 GT", cyl:12, idle:950, redline:8500, gears:[11,18,26,34,42,52],
+        orders:[[1.5,.08,.02],[3,.4,.28],[4.5,.07,.05],[6,1,1],[9,.18,.35],[12,.28,.75],[15,.04,.12],[18,.07,.3],[24,.02,.14]],
+        rough:.22, tgain:.13, mixP:.12,
+        order:[0,1,0,1,0,1,0,1,0,1,0,1], width:.24, attack:13, decay:4.2, rasp:.1, jitter:.05, intake:.1, imbalance:.07, gain:.5,
+        pipe:6, fb:.2, peaks:[[110,5,.9],[1200,3,1],[4500,-3,.8]], drive:1.3,
+        cutBase:320, cutRange:5200, cutLoad:1600, pops:true},
+  f6:  {name:"Flat-six atmo", cyl:6, idle:950, redline:9000, gears:[9,15,21,27,33,39],
+        orders:[[.5,.1,.03],[1.5,.3,.2],[3,1,1],[4.5,.35,.4],[6,.45,.7],[9,.25,.5],[12,.12,.35]],
+        rough:.35, tgain:.13, mixP:.3,
+        order:[0,1,0,1,0,1], width:.28, attack:13, decay:4.6, rasp:.14, jitter:.1, intake:.1, imbalance:.13, gain:.6,
+        pipe:5, fb:.25, peaks:[[90,5,.9],[900,4,1.2],[3500,-3,.8]], drive:1.7,
+        cutBase:240, cutRange:3800, cutLoad:1200, pops:true},
+  i4:  {name:"4 cyl. turbo", cyl:4, idle:850, redline:7000, gears:[8,14,20,27,34,41],
+        orders:[[1,.15,.05],[2,1,1],[3,.1,.05],[4,.45,.5],[6,.15,.2],[8,.1,.15]],
+        rough:.3, tgain:.14, mixP:.3,
+        order:[2,2,2,2], width:.34, attack:9, decay:3.6, rasp:.07, jitter:.12, intake:.14, imbalance:.16, gain:.7,
+        pipe:7, fb:.2, peaks:[[80,7,.9],[480,-2,1],[2000,-7,.8]], drive:1.7,
+        cutBase:190, cutRange:1900, cutLoad:900, pops:true, turbo:true},
+  v8f: {name:"V8 italien", cyl:8, idle:1000, redline:8500, gears:[9.5,15,21,27,33,40],
+        // Vilebrequin plat : allumages alternés entre rangées, pas de demi-ordres -> son aigu et rageur
+        orders:[[2,.5,.4],[4,1,1],[6,.15,.25],[8,.35,.7],[12,.12,.3],[16,.05,.15]],
+        rough:.25, tgain:.13, mixP:.2,
+        order:[0,1,0,1,0,1,0,1], width:.24, attack:13, decay:4.4, rasp:.2, jitter:.06, intake:.12, imbalance:.08, gain:.55,
+        pipe:5, fb:.24, peaks:[[100,5,.9],[1100,4,1.1],[3800,-3,.8]], drive:1.6,
+        cutBase:280, cutRange:4600, cutLoad:1500, pops:true},
+  v10: {name:"V10 atmo", cyl:10, idle:1000, redline:8700, gears:[9,15,21,27,33,40],
+        // Ordre 5 dominant + ordre 10 qui monte : hurlement typique des V10 de course
+        orders:[[1,.1,.03],[2.5,.22,.15],[5,1,1],[7.5,.2,.35],[10,.35,.75],[15,.1,.3],[20,.04,.15]],
+        rough:.3, tgain:.13, mixP:.2,
+        order:[0,1,0,1,0,1,0,1,0,1], width:.22, attack:13, decay:4.4, rasp:.2, jitter:.06, intake:.12, imbalance:.08, gain:.5,
+        pipe:5, fb:.22, peaks:[[105,5,.9],[1300,4,1.1],[4200,-2,.8]], drive:1.5,
+        cutBase:300, cutRange:5000, cutLoad:1500, pops:true},
+  i6:  {name:"6 en ligne", cyl:6, idle:750, redline:7500, gears:[10,16,23,30,37,45],
+        // Ordre 3 très lisse (équilibre parfait du 6 en ligne), ordre 6 soyeux en haut
+        orders:[[1.5,.1,.04],[3,1,1],[4.5,.15,.15],[6,.5,.7],[9,.25,.45],[12,.12,.3]],
+        rough:.2, tgain:.13, mixP:.15,
+        order:[0,1,0,1,0,1], width:.26, attack:12, decay:4.2, rasp:.1, jitter:.05, intake:.1, imbalance:.06, gain:.55,
+        pipe:6, fb:.22, peaks:[[90,6,.9],[800,3,1],[3000,-5,.8]], drive:1.5,
+        cutBase:230, cutRange:3200, cutLoad:1100, pops:true},
+  i5:  {name:"5 cyl. turbo", cyl:5, idle:850, redline:7000, gears:[9,15,21,28,35,42],
+        // Ordre 2,5 + demi-ordres : le "warble" si particulier des 5 cylindres
+        orders:[[.5,.15,.06],[1,.2,.1],[1.5,.2,.1],[2.5,1,1],[3.5,.1,.08],[5,.5,.7],[7.5,.25,.4]],
+        rough:.35, tgain:.13, mixP:.3,
+        order:[2,2,2,2,2], width:.3, attack:10, decay:3.8, rasp:.12, jitter:.12, intake:.14, imbalance:.15, gain:.65,
+        pipe:7, fb:.24, peaks:[[85,6,.9],[650,3,1],[2400,-5,.8]], drive:1.8,
+        cutBase:210, cutRange:2400, cutLoad:1000, pops:true, turbo:true},
+  b4:  {name:"Flat-4 turbo", cyl:4, idle:800, redline:7000, gears:[8.5,14.5,20.5,27,33,40],
+        // Collecteurs de longueurs inégales : deux allumages rapprochés par rangée -> grondement à demi-ordres
+        orders:[[.5,.35,.15],[1,.4,.2],[1.5,.25,.1],[2,1,1],[3,.12,.1],[4,.4,.5],[6,.1,.2]],
+        rough:.45, tgain:.12, mixP:.45,
+        order:[0,0,1,1], width:.32, attack:9, decay:3.4, rasp:.08, jitter:.18, intake:.12, imbalance:.22, gain:.65,
+        pipe:8, fb:.22, peaks:[[75,8,.9],[420,-2,1],[2000,-7,.8]], drive:1.7,
+        cutBase:190, cutRange:1900, cutLoad:900, pops:true, turbo:true},
+  rot: {name:"Rotatif", cyl:4, idle:1000, redline:9000, gears:[8,13,19,25,31],
+        // Moteur à pistons rotatifs, 2 rotors : impulsions brèves et violentes, ralenti saccadé, "brap" caractéristique
+        orders:[[1,.3,.15],[2,1,1],[3,.25,.3],[4,.5,.7],[6,.3,.5],[8,.2,.4]],
+        rough:.4, tgain:.12, mixP:.5,
+        order:[2,2,2,2], width:.22, attack:16, decay:5, rasp:.4, jitter:.35, intake:.1, imbalance:.1, gain:.7,
+        pipe:4, fb:.3, peaks:[[110,5,.9],[1000,5,1.2],[3200,-2,.8]], drive:2.2,
+        cutBase:300, cutRange:3800, cutLoad:1400, pops:true}
+};
+
+/* ---------- Préférences (localStorage, facultatif) ---------- */
+const store = {
+  get(k,d){try{const v=localStorage.getItem("vroum."+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("vroum."+k,JSON.stringify(v))}catch(e){}}
+};
+
+/* ---------- État ---------- */
+const S = {
+  engine: (k=>ENGINES[k]?k:"f458")(store.get("engine","f458")),
+  mode: "gps",          // "gps" | "test"
+  vol: store.get("vol",70),
+  running:false,
+  speed:0,              // km/h affichée/lissée
+  accel:0,              // m/s² estimée
+  rpm:800, targetRpm:800,
+  gear:0,               // 0 = point mort
+  load:.2, targetLoad:.2,
+  shiftLock:0,          // anti-pompage après un passage
+  shiftDip:0,           // coupure d'injection pendant un passage
+  popWindow:0,          // fenêtre de pétarades au lever de pied
+  cut:0,                // coupure du rupteur
+  boost:0, bovLock:0,   // pression turbo, anti-répétition de la décharge
+  gas:false, brake:false, throttle:0,
+  gps:{ watch:null, speed:0, accel:0, t:0, last:null }
+};
+
+/* =========================================================
+   Audio : synthèse cylindre par cylindre
+   Chaque explosion génère une impulsion d'échappement (avec claquement de combustion
+   et petite irrégularité), routée vers la rangée gauche ou droite selon l'ordre d'allumage.
+   Le signal passe ensuite dans une ligne d'échappement simulée :
+   tube résonant (retard + réinjection) -> silencieux (filtres) -> passe-bas selon la charge -> saturation
+   ========================================================= */
+const DSP_SRC = `
+class EngineDSP{
+  constructor(sr){
+    this.sr=sr; this.ph=0; this.rpm=800; this.tr=800; this.ld=.2; this.tl=.2; this.cut=false; this.p=null;
+    this.x1=[0,0]; this.y1=[0,0]; this.evp=0; this.evw=0; this.ni=0; this.nr=0;
+    this.a=1-Math.exp(-1/(sr*.02));          // lissage des paramètres (20 ms)
+    this.rc=1-Math.exp(-6.2832*14/sr);       // vitesse des fluctuations d'ordres (~14 Hz)
+  }
+  setProfile(p){
+    this.p=p; const n=p.electric?0:p.order.length, no=(p.orders||[]).length;
+    this.amp=new Float32Array(n).fill(1);   // amplitude de l'explosion en cours, par cylindre
+    this.lq=new Float32Array(n).fill(1);    // phase précédente, pour détecter chaque nouvel allumage
+    this.imb=new Float32Array(n);           // déséquilibre fixe entre cylindres
+    for(let c=0;c<n;c++) this.imb[c]=1+(Math.random()*2-1)*p.imbalance;
+    this.op=new Float32Array(no);           // phase de chaque ordre moteur
+    this.ro=new Float32Array(no);           // fluctuation lente de chaque ordre
+  }
+  set(m){ this.tr=m.rpm; this.tl=m.load; this.cut=m.cut; }
+  render(L,R,n){
+    const p=this.p, TAU=6.283185307;
+    if(!p){ L.fill(0); R.fill(0); return; }
+    for(let i=0;i<n;i++){
+      this.rpm+=(this.tr-this.rpm)*this.a; this.ld+=(this.tl-this.ld)*this.a;
+      let l=0, r=0;
+      const wn=Math.random()*2-1;
+      this.ni+=.06*(wn-this.ni);   // souffle grave (~450 Hz)
+      this.nr+=.2*(wn-this.nr);    // rugosité (~1.6 kHz)
+      if(p.electric){
+        // Moteur électrique : fondamentale + harmoniques + léger sifflement inharmonique
+        const f=40+this.rpm/60*2.2, lvl=Math.min(1,this.rpm/400)*(.25+.75*this.ld);
+        this.evp+=TAU*f/this.sr; if(this.evp>TAU) this.evp-=TAU;
+        this.evw+=TAU*f*7.31/this.sr; if(this.evw>TAU) this.evw-=TAU;
+        l=r=lvl*(Math.sin(this.evp)*.6+Math.sin(2*this.evp)*.12+Math.sin(3*this.evp)*.22+Math.sin(this.evw)*.05)*p.gain;
+      } else {
+        const rf=this.rpm/60, rn=Math.min(1,this.rpm/p.redline), ld=this.ld, fo=p.cyl/2;
+
+        // 1) Partie tonale : ordres moteur (multiples de la fréquence vilebrequin)
+        //    Chaque ordre a son amplitude au ralenti et en haut, et fluctue légèrement comme sur un vrai moteur
+        let ton=0;
+        const O=p.orders;
+        for(let j=0;j<O.length;j++){
+          const o=O[j][0];
+          this.op[j]+=TAU*o*rf/this.sr; if(this.op[j]>TAU) this.op[j]-=TAU;
+          this.ro[j]+=this.rc*(wn*(j%2?1:-1)-this.ro[j]);
+          let a=O[j][1]+(O[j][2]-O[j][1])*rn;
+          if(o>fo) a*=.35+.65*ld;                 // les ordres hauts s'ouvrent avec la charge
+          ton+=a*(1+p.rough*this.ro[j]*22)*Math.sin(this.op[j]);
+        }
+        ton*=p.tgain*(.3+.7*ld)*(this.cut?.2:1);
+        ton+=this.ni*p.intake*ld*(.3+rn)*.6;      // souffle d'admission à pleine charge
+
+        // 2) Texture : impulsions d'échappement cylindre par cylindre (donne le côté irrégulier, vivant)
+        this.ph+=rf/2/this.sr; if(this.ph>=1) this.ph-=1;
+        const nc=p.order.length, w=p.width, k=p.decay;
+        let pl=0, pr=0;
+        for(let c=0;c<nc;c++){
+          let q=this.ph-c/nc; if(q<0) q+=1;
+          if(q<this.lq[c]){
+            let A=1+(Math.random()*2-1)*p.jitter*(.35+.65*(1-rn));
+            if(this.cut && Math.random()<.75) A=0;
+            this.amp[c]=A*this.imb[c];
+          }
+          this.lq[c]=q;
+          if(q<w){
+            const s=q/w, env=(1-Math.exp(-s*p.attack))*Math.exp(-k*s)*(1-s);
+            const v=this.amp[c]*env*((.3+.7*ld) + this.nr*p.rasp*(.3+ld));
+            const b=p.order[c]; if(b===0) pl+=v; else if(b===1) pr+=v; else { pl+=v; pr+=v; }
+          }
+        }
+        l=(ton*(1-p.mixP)+pl*p.mixP*p.gain);
+        r=(ton*(1-p.mixP)+pr*p.mixP*p.gain);
+      }
+      // Suppression de la composante continue
+      const yl=l-this.x1[0]+.995*this.y1[0]; this.x1[0]=l; this.y1[0]=yl;
+      const yr=r-this.x1[1]+.995*this.y1[1]; this.x1[1]=r; this.y1[1]=yr;
+      L[i]=yl; R[i]=yr;
+    }
+  }
+}`;
+const WORKLET_SRC = DSP_SRC + `
+class EngineProc extends AudioWorkletProcessor{
+  constructor(){ super(); this.d=new EngineDSP(sampleRate);
+    this.port.onmessage=e=>{ const m=e.data; if(m.profile) this.d.setProfile(m.profile); else this.d.set(m); }; }
+  process(i,o){ const out=o[0]; this.d.render(out[0], out[1]||out[0], out[0].length); return true; }
+}
+registerProcessor("engine-proc",EngineProc);`;
+
+let ctx=null, N={}, noiseBuf=null;
+
+async function buildAudio(){
+  ctx = new (window.AudioContext||window.webkitAudioContext)();
+  ctx.resume();
+
+  // Bruit blanc (pétarades, décharge turbo)
+  noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
+  const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+
+  // Sortie
+  N.comp=ctx.createDynamicsCompressor(); N.comp.threshold.value=-12; N.comp.ratio.value=4; N.comp.connect(ctx.destination);
+  N.master=ctx.createGain(); N.master.gain.value=0; N.master.connect(N.comp);
+  N.bus=ctx.createGain(); N.bus.connect(N.master);
+  N.shaper=ctx.createWaveShaper(); N.shaper.oversample="4x"; N.shaper.connect(N.bus);
+  // Double passe-bas (pente 24 dB/oct) : son sombre, comme entendu depuis l'habitacle
+  N.lp2=ctx.createBiquadFilter(); N.lp2.type="lowpass"; N.lp2.Q.value=.6; N.lp2.connect(N.shaper);
+  N.lp=ctx.createBiquadFilter(); N.lp.type="lowpass"; N.lp.Q.value=.6; N.lp.connect(N.lp2);
+  // Renfort de grave (le "corps" du moteur)
+  N.shelf=ctx.createBiquadFilter(); N.shelf.type="lowshelf"; N.shelf.frequency.value=140; N.shelf.gain.value=6; N.shelf.connect(N.lp);
+  // Silencieux : 3 filtres en cloche
+  N.peaks=[0,1,2].map(()=>{ const f=ctx.createBiquadFilter(); f.type="peaking"; return f; });
+  N.peaks[0].connect(N.peaks[1]); N.peaks[1].connect(N.peaks[2]); N.peaks[2].connect(N.shelf);
+  // Tube d'échappement résonant : retard + réinjection
+  N.sum=ctx.createGain(); N.sum.connect(N.peaks[0]);
+  N.delay=ctx.createDelay(.05); N.fb=ctx.createGain();
+  N.sum.connect(N.delay); N.delay.connect(N.fb); N.fb.connect(N.sum);
+  N.hp=ctx.createBiquadFilter(); N.hp.type="highpass"; N.hp.frequency.value=28; N.hp.connect(N.sum);
+
+  // Générateur d'impulsions : AudioWorklet, ou ScriptProcessor en secours
+  try{
+    if(!ctx.audioWorklet) throw 0;
+    const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
+    await ctx.audioWorklet.addModule(url);
+    N.src=new AudioWorkletNode(ctx,"engine-proc",{numberOfInputs:0,outputChannelCount:[2]});
+    N.send=m=>N.src.port.postMessage(m);
+  }catch(e){
+    const DSP=new Function(DSP_SRC+";return EngineDSP;")(), dsp=new DSP(ctx.sampleRate);
+    N.src=ctx.createScriptProcessor(1024,0,2);
+    N.src.onaudioprocess=ev=>{ const b=ev.outputBuffer; dsp.render(b.getChannelData(0),b.getChannelData(1),b.length); };
+    N.send=m=>{ if(m.profile) dsp.setProfile(m.profile); else dsp.set(m); };
+  }
+  N.src.connect(N.hp);
+
+  // Sifflement turbo
+  N.turbo=ctx.createOscillator(); N.turbo.type="sine"; N.turboG=ctx.createGain(); N.turboG.gain.value=0;
+  N.turbo.connect(N.turboG).connect(N.master); N.turbo.start();
+
+  // Chaîne des vrais enregistrements : passe-bas selon la charge (pied levé = son étouffé)
+  N.recBus=ctx.createGain(); N.recBus.connect(N.master);
+  N.recLP=ctx.createBiquadFilter(); N.recLP.type="lowpass"; N.recLP.Q.value=.5; N.recLP.connect(N.recBus);
+  N.rec={};
+
+  // Chaîne des voitures réelles
+  N.realBus=ctx.createGain(); N.realBus.connect(N.master);
+  N.realLP=ctx.createBiquadFilter(); N.realLP.type="lowpass"; N.realLP.Q.value=.5; N.realLP.frequency.value=20000; N.realLP.connect(N.realBus);
+  N.real=null;
+
+  applyProfile();
+}
+
+// Applique le moteur choisi : générateur + ligne d'échappement
+function applyProfile(){
+  if(!ctx) return;
+  const P=ENGINES[S.engine].real ? ENGINES.v8 : ENGINES[S.engine];   // la synthèse reste prête mais muette pour une voiture réelle
+  loadReal();
+  N.send({profile:{electric:!!P.electric, order:P.order||[], width:P.width, decay:P.decay, rasp:P.rasp,
+    jitter:P.jitter, intake:P.intake, attack:P.attack, cyl:P.cyl, orders:P.orders||[], rough:P.rough, tgain:P.tgain, mixP:P.mixP, imbalance:P.imbalance, gain:P.gain, redline:P.redline}});
+  N.delay.delayTime.value=P.pipe/1000;
+  N.fb.gain.value=P.fb;
+  P.peaks.forEach(([f,g,q],i)=>{ N.peaks[i].frequency.value=f; N.peaks[i].gain.value=g; N.peaks[i].Q.value=q; });
+  const c=new Float32Array(2048), k=P.drive;
+  for(let i=0;i<c.length;i++){ const x=i/1023.5-1; c[i]=Math.tanh(k*x)/Math.tanh(k); }
+  N.shaper.curve=c;
+}
+
+// Pétarade : rafale de bruit grave injectée dans la ligne d'échappement
+function pop(){
+  const t=ctx.currentTime, src=ctx.createBufferSource(), lp=ctx.createBiquadFilter(), g=ctx.createGain();
+  src.buffer=noiseBuf; lp.type="lowpass"; lp.frequency.value=450+Math.random()*700;
+  const peak=.6+Math.random()*.6;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+.003);
+  g.gain.exponentialRampToValueAtTime(.001,t+.035+Math.random()*.06);
+  src.connect(lp).connect(g).connect(ENGINES[S.engine].real ? N.master : N.sum);
+  src.start(t,Math.random()*1.5); src.stop(t+.12);
+}
+
+// Décharge de la soupape turbo au lever de pied
+function blowOff(){
+  const t=ctx.currentTime, src=ctx.createBufferSource(), bp=ctx.createBiquadFilter(), g=ctx.createGain();
+  src.buffer=noiseBuf; bp.type="bandpass"; bp.Q.value=.9;
+  bp.frequency.setValueAtTime(3200,t); bp.frequency.exponentialRampToValueAtTime(1400,t+.4);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.22,t+.02);
+  g.gain.exponentialRampToValueAtTime(.001,t+.45);
+  src.connect(bp).connect(g).connect(N.master);
+  src.start(t,Math.random()); src.stop(t+.5);
+}
+
+/* =========================================================
+   Voitures réelles : chargement et mixage des boucles enregistrées
+   ========================================================= */
+const realCache={};            // url -> AudioBuffer décodé (gardé pour les changements de voiture)
+let realGen=0;
+async function fetchBuf(url){
+  if(!realCache[url]){
+    realCache[url]=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(b=>ctx.decodeAudioData(b)).catch(e=>{ delete realCache[url]; throw e; });
+  }
+  return realCache[url];
+}
+function stopReal(){
+  if(!N.real) return;
+  N.real.nodes.forEach(n=>{ try{ n.src.stop(); }catch(e){} n.g.disconnect(); });
+  N.real=null;
+}
+async function loadReal(){
+  const key=S.engine, P=ENGINES[key];
+  const gen=++realGen;
+  stopReal();
+  if(!P.real) return;
+  const R=P.real, items=[];                        // {id, url, rpm, vol, set}
+  if(R.type==="layers"){
+    for(const id in R.layers) items.push({id, url:R.dir+id+".flac", rpm:R.layers[id].rpm, vol:R.layers[id].vol});
+    if(R.limiter) items.push({id:"limiter", url:R.dir+R.limiter.file+".flac", rpm:0, vol:R.limiter.vol});
+  } else {
+    for(const set in R.sets) R.sets[set].rpms.forEach(rpm=>items.push({id:set+rpm, set, url:R.dir+set+"/"+rpm+".flac", rpm, vol:R.sets[set].vol}));
+  }
+  let done=0;
+  const progress=()=>{ if(gen===realGen && S.engine===key) $("srcHint").textContent=`Chargement des sons… ${done}/${items.length}`; };
+  progress();
+  try{
+    const bufs=await Promise.all(items.map(it=>fetchBuf(it.url).then(b=>{ done++; progress(); return b; })));
+    if(gen!==realGen) return;                      // une autre voiture a été choisie entre-temps
+    const nodes=items.map((it,i)=>{
+      const src=ctx.createBufferSource(), g=ctx.createGain(); g.gain.value=0;
+      src.buffer=bufs[i]; src.loop=true; src.connect(g).connect(N.realLP);
+      src.start(0, Math.random()*bufs[i].duration);
+      return {...it, src, g};
+    });
+    N.real={key, nodes, byId:Object.fromEntries(nodes.map(n=>[n.id,n]))};
+    refreshRecUI();
+  }catch(e){
+    if(gen!==realGen) return;
+    $("srcHint").textContent="Sons introuvables";
+    showAlert(location.protocol==="file:"
+      ? "Les sons des voitures réelles ne se chargent pas depuis un fichier local. Ouvre Vroum depuis son adresse en ligne (GitHub Pages)."
+      : "Les sons de cette voiture n'ont pas pu être chargés. Vérifie que le dossier audio est bien en ligne à côté de la page, puis rechoisis la voiture.");
+  }
+}
+const ease=(v,a,b)=>Math.min(1,Math.max(0,(v-a)/(b-a)));
+function updateReal(P,load,t){
+  const R=P.real, L=N.real;
+  if(!L || L.key!==S.engine) return;
+  const rpm=Math.max(S.rpm,P.idle*.8);
+  const th=ease(load,.06,.6);                      // charge -> "pied sur l'accélérateur"
+  const on=Math.sin(th*Math.PI/2), off=Math.cos(th*Math.PI/2);
+  const set=(n,g,rate)=>{ n.g.gain.setTargetAtTime(g*n.vol,t,.04); if(rate) n.src.playbackRate.setTargetAtTime(rate,t,.03); };
+  if(R.type==="layers"){
+    const x=ease(rpm,R.xfade[0],R.xfade[1]), hi=Math.sin(x*Math.PI/2), lo=Math.cos(x*Math.PI/2);
+    const lim=Math.max(S.cut>0?1:0, ease(rpm,P.redline*.93,P.redline));
+    const rate=r=>Math.pow(2,(rpm-r)*R.pitch/1200);
+    const B=L.byId;
+    set(B.on_low,  on*lo*(1-lim*.5), rate(B.on_low.rpm));
+    set(B.on_high, on*hi*(1-lim*.5), rate(B.on_high.rpm));
+    set(B.off_low, off*lo, rate(B.off_low.rpm));
+    set(B.off_high,off*hi, rate(B.off_high.rpm));
+    if(B.limiter) set(B.limiter, lim*on, 0);
+  } else {
+    // Multi-régimes : les deux boucles les plus proches du régime, fondu à puissance constante
+    for(const name in R.sets){
+      const nodes=L.nodes.filter(n=>n.set===name), lvl=name==="exh" ? .5+.5*th : .75+.25*th;
+      let i=nodes.findIndex(n=>n.rpm>rpm);
+      if(i<0) i=nodes.length-1; if(i===0) i=1;
+      const a=nodes[i-1], b=nodes[i], x=ease(rpm,a.rpm,b.rpm);
+      nodes.forEach(n=>{ if(n!==a&&n!==b) n.g.gain.setTargetAtTime(0,t,.04); });
+      set(a, Math.cos(x*Math.PI/2)*lvl, rpm/a.rpm);
+      set(b, Math.sin(x*Math.PI/2)*lvl, rpm/b.rpm);
+    }
+  }
+  N.realLP.frequency.setTargetAtTime(5000+th*15000,t,.06);   // pied levé : un peu plus étouffé
+}
+
+// Met à jour les paramètres audio à chaque image
+function updateAudio(){
+  if(!ctx||!S.running||!N.send) return;
+  const P=ENGINES[S.engine], t=ctx.currentTime;
+  const rn=Math.min(1,S.rpm/P.redline);
+  const load=S.load*(S.shiftDip>0?.15:1);                 // coupure pendant le passage de rapport
+  N.send({rpm:S.rpm, load, cut:S.cut>0});
+  const cut=P.real?20000:P.cutBase+rn*P.cutRange+load*P.cutLoad;
+  N.lp.frequency.setTargetAtTime(cut,t,.04);
+  N.lp2.frequency.setTargetAtTime(cut*1.3,t,.04);
+  const hasRec = !!(N.rec.low||N.rec.high);
+  N.bus.gain.setTargetAtTime(hasRec||P.real?0:(P.electric?1:(.45+.55*load)*(.7+.3*rn)),t,.05);
+  N.realBus.gain.setTargetAtTime(hasRec||!P.real?0:1,t,.05);
+  if(P.real && !hasRec) updateReal(P,load,t);
+  if(hasRec){
+    // Vitesse de lecture = régime actuel / régime de l'enregistrement
+    const lo=N.rec.low, hi=N.rec.high;
+    let x = hi&&lo ? Math.min(1,Math.max(0,(S.rpm-lo.rpm)/(hi.rpm-lo.rpm))) : (hi?1:0);
+    const lvl=(P.electric?1:(.45+.55*load))*(S.cut>0?.35:1);
+    [[lo,Math.cos(x*Math.PI/2)],[hi,Math.sin(x*Math.PI/2)]].forEach(([r,g])=>{
+      if(!r) return;
+      r.src.playbackRate.setTargetAtTime(Math.min(4,Math.max(.25,Math.max(S.rpm,200)/r.rpm)),t,.03);
+      r.g.gain.setTargetAtTime(g*lvl,t,.05);
+    });
+    N.recLP.frequency.setTargetAtTime(900+load*9000+rn*4000,t,.06);
+  }
+  if(P.turbo){
+    N.turbo.frequency.setTargetAtTime(1500+S.boost*5500,t,.08);
+    N.turboG.gain.setTargetAtTime(S.boost*.035,t,.08);
+  } else N.turboG.gain.setTargetAtTime(0,t,.05);
+  if(P.pops && S.popWindow>0 && S.rpm>2500 && Math.random()<.06) pop();
+}
+/* =========================================================
+   Modèle de transmission : vitesse + accélération -> rapport + régime
+   ========================================================= */
+function stepEngine(dt){
+  const P=ENGINES[S.engine];
+  S.shiftLock=Math.max(0,S.shiftLock-dt);
+  S.shiftDip=Math.max(0,S.shiftDip-dt);
+  S.popWindow=Math.max(0,S.popWindow-dt);
+  S.cut=Math.max(0,S.cut-dt);
+  S.bovLock=Math.max(0,S.bovLock-dt);
+
+  // Charge moteur estimée (accélération positive = gros gaz)
+  let tl;
+  if(S.mode==="test") tl = .05+.95*S.throttle;
+  else if(S.accel>.15) tl = Math.min(1,.2+S.accel/2.2);
+  else if(S.accel<-.3) tl = .03;                         // frein moteur
+  else tl = .22;                                         // croisière
+  // Lever de pied : ouvre une fenêtre de pétarades
+  if(S.load>.45 && tl<.1) S.popWindow=.9;
+  S.targetLoad=tl;
+  S.load += (S.targetLoad-S.load)*Math.min(1,dt/.25);
+
+  // Coup de gaz à l'arrêt
+  const revving = S.gas && S.speed<2;
+
+  if(P.electric){
+    S.gear = S.speed<1 ? 0 : 1;
+    S.targetRpm = S.speed/P.gears[0]*1000;
+  } else if(S.speed<2){
+    S.gear=0;                                            // point mort
+    S.targetRpm = revving ? P.redline*1.02 : P.idle;     // pied au plancher = rupteur
+    if(revving) S.load=Math.max(S.load,.8);
+  } else {
+    if(S.gear===0) S.gear=1;
+    const up   = (.42+.51*S.load)*P.redline;             // seuil de montée selon la charge
+    const down = Math.max(P.idle*1.5, up*.45);           // seuil de rétrogradage
+    const rpmIn = g => S.speed/P.gears[g-1]*1000;
+    if(!S.shiftLock){
+      if(S.gear<P.gears.length && rpmIn(S.gear)>up && rpmIn(S.gear+1)>down*1.1){
+        S.gear++; S.shiftLock=.45; S.shiftDip=.12;
+      } else if(S.gear>1 && rpmIn(S.gear)<down){
+        S.gear--; S.shiftLock=.45;
+        if(S.load<.1) S.popWindow=Math.max(S.popWindow,.4); // pétarade au rétro
+      }
+    }
+    // En 1re à très basse vitesse : patinage d'embrayage
+    S.targetRpm = Math.max(rpmIn(S.gear), S.gear===1 ? P.idle*1.3+S.load*1500 : P.idle*1.05);
+  }
+  S.targetRpm = Math.min(S.targetRpm, P.redline*1.02);
+
+  // Le régime rejoint la cible avec une vitesse limitée (balayage réaliste)
+  const rate = (S.targetRpm>S.rpm ? (revving?7000:9000) : 6500)*(P.electric?3:1);
+  const diff = S.targetRpm-S.rpm;
+  S.rpm += Math.sign(diff)*Math.min(Math.abs(diff),rate*dt);
+  // Petit tremblement au ralenti, pour la vie
+  if(!P.electric && S.gear===0 && !revving) S.rpm += (Math.random()-.5)*12;
+
+  // Rupteur : coupe l'allumage et fait rebondir le régime
+  if(!P.electric && S.rpm>=P.redline*.995 && S.targetRpm>=P.redline*.99){ S.cut=.07; S.rpm-=220; }
+
+  // Turbo : la pression monte avec la charge et le régime
+  if(P.turbo){
+    const tb=Math.max(0,Math.min(1,(S.load-.3)*1.6*Math.min(1,S.rpm/(P.redline*.5))));
+    const prev=S.boost;
+    S.boost+=(tb-S.boost)*Math.min(1,dt/(tb>S.boost?.7:.2));
+    if(prev>.45 && S.targetLoad<.1 && !S.bovLock && S.running && ctx){ blowOff(); S.bovLock=1.5; }
+  } else S.boost=0;
+}
+
+/* ---------- Mode Essai : voiture simulée ---------- */
+function stepTest(dt){
+  S.throttle += ((S.gas?1:0)-S.throttle)*Math.min(1,dt/.12);
+  const v=S.speed/3.6;                                    // m/s
+  const P=ENGINES[S.engine];
+  const vmax = (P.gears[P.gears.length-1]*P.redline/1000)/3.6;
+  let a = S.throttle*4.2*Math.max(0,1-v/vmax) - .4 - .0004*v*v;
+  if(S.brake) a -= 7.5;
+  if(S.speed<2 && !S.brake && S.throttle>0 && !P.electric) a=Math.max(a,0); // démarrage
+  let nv = Math.max(0, v + a*dt);
+  if(S.speed<2 && S.throttle===0) nv=Math.max(0,nv-1*dt);
+  S.accel = (nv-v)/Math.max(dt,1e-3);
+  S.speed = nv*3.6;
+}
+
+/* ---------- Mode GPS ---------- */
+function haversine(a,b){
+  const R=6371000, toR=x=>x*Math.PI/180;
+  const dLat=toR(b.latitude-a.latitude), dLon=toR(b.longitude-a.longitude);
+  const h=Math.sin(dLat/2)**2+Math.cos(toR(a.latitude))*Math.cos(toR(b.latitude))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function onFix(pos){
+  const g=S.gps, now=performance.now(), c=pos.coords;
+  let v = (c.speed!==null && !isNaN(c.speed)) ? c.speed : null;   // m/s fourni par le GPS
+  if(v===null && g.last){                                          // sinon calcul par distance
+    const dt=(pos.timestamp-g.last.ts)/1000;
+    if(dt>0.3) v=haversine(g.last.c,c)/dt;
+  }
+  if(v===null) v=0;
+  if(v<.5) v=0;                                                    // filtre la dérive à l'arrêt
+  if(g.t){
+    const dt=(now-g.t)/1000;
+    if(dt>0.2){ const a=(v-g.speed)/dt; g.accel = g.accel*.5 + Math.max(-9,Math.min(9,a))*.5; }
+  }
+  g.speed=v; g.t=now; g.last={c:{latitude:c.latitude,longitude:c.longitude},ts:pos.timestamp};
+  setGps("ok",`GPS ±${Math.round(c.accuracy)} m`);
+}
+function onGpsErr(e){
+  if(e.code===1){
+    setGps("err","GPS refusé");
+    showAlert("La localisation est refusée pour ce site. Autorise-la dans le navigateur, puis réessaie. Le mode Essai marche sans GPS.","Réessayer",()=>{ stopGps(); startGps(); });
+  } else {
+    setGps("warn", e.code===2 ? "GPS indisponible" : "GPS sans signal");   // watchPosition continue de chercher
+  }
+}
+function startGps(){
+  if(!("geolocation" in navigator)){ setGps("err","Pas de GPS"); showAlert("Ce navigateur ne donne pas accès au GPS. Utilise le mode Essai."); return; }
+  if(!window.isSecureContext){ setGps("err","HTTPS requis"); showAlert("Le GPS ne marche que sur une page en https://. Ouvre Vroum depuis son adresse GitHub Pages. Le mode Essai marche partout."); return; }
+  if(S.gps.watch!==null) return;
+  hideAlert();
+  setGps("warn","Recherche GPS…");
+  S.gps.watch = navigator.geolocation.watchPosition(onFix,onGpsErr,{enableHighAccuracy:true,maximumAge:0,timeout:10000});
+}
+function stopGps(){
+  if(S.gps.watch!==null){ navigator.geolocation.clearWatch(S.gps.watch); S.gps.watch=null; }
+  S.gps.speed=0; S.gps.accel=0; S.gps.t=0;
+  setGps("", S.mode==="test" ? "GPS en pause" : "GPS éteint");
+}
+function stepGps(dt){
+  const g=S.gps;
+  // Extrapolation entre deux points GPS (≈1 Hz) pour un régime fluide
+  const since = g.t ? Math.min(1.2,(performance.now()-g.t)/1000) : 0;
+  const est = Math.max(0, g.speed + g.accel*since)*3.6;
+  S.speed += (est-S.speed)*Math.min(1,dt/.3);
+  S.accel = g.accel;
+}
+
+/* =========================================================
+   Compte-tours (canvas)
+   ========================================================= */
+const cv=document.getElementById("tach"), cx2=cv.getContext("2d");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function sizeCanvas(){
+  const r=cv.getBoundingClientRect(), dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.max(200,Math.round(r.width*dpr)); cv.height=cv.width;
+}
+// Couleurs et polices lues une fois (pas de getComputedStyle à chaque image)
+const TOK={};
+function readTokens(){
+  const cs=getComputedStyle(document.documentElement);
+  ["--fg","--muted","--amber","--red","--line","--panel","--f-digit","--f-body"].forEach(k=>TOK[k]=cs.getPropertyValue(k).trim());
+}
+// Aiguille affichée : balayage au démarrage, retour à zéro moteur coupé
+const NEEDLE={rpm:0, sweep:0};
+function needleRpm(dt){
+  const P=ENGINES[S.engine];
+  if(NEEDLE.sweep>0){
+    NEEDLE.sweep=Math.max(0,NEEDLE.sweep-dt);
+    const x=1-NEEDLE.sweep/1.1;                           // 0 -> 1 sur 1,1 s
+    const peak=P.electric?P.redline*.6:P.redline;
+    NEEDLE.rpm = x<.45 ? peak*(1-Math.pow(1-x/.45,3)) : peak*(1-(x-.45)/.55)+S.rpm*((x-.45)/.55);
+  } else {
+    const target=S.running?S.rpm:0;
+    NEEDLE.rpm += (target-NEEDLE.rpm)*Math.min(1,dt/(S.running?.03:.25));
+  }
+  return NEEDLE.rpm;
+}
+function drawTach(rpm){
+  const P=ENGINES[S.engine], W=cv.width, c=cx2, R=W/2, T=TOK;
+  c.clearRect(0,0,W,W);
+  c.save(); c.translate(R,R);
+  const a0=Math.PI*.75, a1=Math.PI*2.25;                  // arc de 270°
+  const maxR = P.electric ? 18000 : Math.ceil(P.redline/1000+1)*1000;
+  const ang = r => a0+(a1-a0)*Math.max(0,Math.min(r,maxR))/maxR;
+  const rr=R*.86;
+
+  // Fond de cadran
+  c.beginPath(); c.arc(0,0,R*.96,0,Math.PI*2); c.fillStyle=T["--panel"]; c.fill();
+  c.lineWidth=R*.012; c.strokeStyle=T["--line"]; c.stroke();
+
+  // Zone rouge
+  if(!P.electric){
+    c.beginPath(); c.arc(0,0,rr,ang(P.redline),a1);
+    c.lineWidth=R*.05; c.strokeStyle=T["--red"]; c.stroke();
+  }
+  // Arc de régime actuel
+  if(rpm>1){
+    c.beginPath(); c.arc(0,0,rr,a0,ang(rpm));
+    c.lineWidth=R*.05; c.strokeStyle=T["--amber"]; c.globalAlpha=.28; c.stroke(); c.globalAlpha=1;
+  }
+
+  // Graduations
+  const step = P.electric ? 2000 : 1000;
+  c.textAlign="center"; c.textBaseline="middle";
+  c.font=`600 ${Math.round(R*.085)}px ${T["--f-digit"]}`;
+  for(let r=0;r<=maxR;r+=step/2){
+    const a=ang(r), major=r%step===0, red=!P.electric && r>=P.redline;
+    const r1=rr-R*(major?.11:.06), r2=rr-R*.03;
+    c.beginPath(); c.moveTo(Math.cos(a)*r1,Math.sin(a)*r1); c.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);
+    c.lineWidth=R*(major?.014:.007); c.strokeStyle=red?T["--red"]:T["--fg"]; c.stroke();
+    if(major){ const rt=rr-R*.2; c.fillStyle=red?T["--red"]:T["--fg"]; c.fillText(String(r/1000),Math.cos(a)*rt,Math.sin(a)*rt); }
+  }
+  c.font=`500 ${Math.round(R*.045)}px ${T["--f-body"]}`; c.fillStyle=T["--muted"];
+  c.fillText("×1000 tr/min",0,R*.62);
+
+  // Mode (lisible d'un coup d'œil)
+  c.font=`700 ${Math.round(R*.05)}px ${T["--f-digit"]}`;
+  c.fillStyle = S.mode==="test" ? T["--amber"] : T["--muted"];
+  c.fillText(S.mode==="test" ? "ESSAI" : (S.gps.t ? "GPS" : ""),0,-R*.52);
+
+  // Aiguille
+  const a=ang(rpm);
+  c.save(); c.rotate(a);
+  c.beginPath(); c.moveTo(-R*.08,-R*.012); c.lineTo(rr-R*.02,0); c.lineTo(-R*.08,R*.012); c.closePath();
+  c.fillStyle = (!P.electric && rpm>=P.redline*.97) ? T["--red"] : T["--amber"]; c.fill();
+  c.restore();
+  c.beginPath(); c.arc(0,0,R*.05,0,Math.PI*2); c.fillStyle=T["--line"]; c.fill();
+
+  // Vitesse
+  c.fillStyle=T["--fg"];
+  c.font=`700 ${Math.round(R*.34)}px ${T["--f-digit"]}`;
+  c.fillText(String(Math.round(S.speed)),0,R*.25);
+  c.font=`500 ${Math.round(R*.055)}px ${T["--f-body"]}`; c.fillStyle=T["--muted"];
+  c.fillText("km/h",0,R*.44);
+  // Rapport
+  const gl = !S.running ? "–" : P.electric ? (S.gear?"D":"P") : (S.gear===0?"N":String(S.gear));
+  c.font=`700 ${Math.round(R*.15)}px ${T["--f-digit"]}`; c.fillStyle=S.running?T["--amber"]:T["--muted"];
+  c.fillText(gl,0,-R*.3);
+  c.restore();
+}
+
+/* =========================================================
+   Boucle principale
+   ========================================================= */
+let lastT=performance.now(), audioCheck=0;
+function loop(t){
+  const dt=Math.min(.1,(t-lastT)/1000); lastT=t;
+  if(S.mode==="test") stepTest(dt); else stepGps(dt);
+  stepEngine(dt);
+  updateAudio();
+  drawTach(needleRpm(dt));
+  // Le navigateur peut suspendre le son (appel, autre onglet) : on le signale avec un bouton pour relancer
+  if(S.running && ctx && (audioCheck+=dt)>.5){
+    audioCheck=0;
+    if(ctx.state!=="running"){ setAudio("err","Son suspendu"); showAlert("Le navigateur a suspendu le son.","Relancer le son",async()=>{ try{ await ctx.resume(); }catch(e){} if(ctx.state==="running"){ hideAlert(); setAudio("ok","Moteur en marche"); } }); }
+  }
+  requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   Interface
+   ========================================================= */
+const $=id=>document.getElementById(id);
+function setPill(id,state,txt){ const el=$(id); el.className="pill"+(state?" "+state:""); el.textContent=txt; }
+function setGps(state,txt){ setPill("gpsStatus",state,txt); }
+function setAudio(state,txt){ setPill("audioStatus",state,txt); }
+let alertAction=null;
+function showAlert(text,btn,action){
+  $("alertText").textContent=text;
+  $("alertBtn").hidden=!btn; if(btn) $("alertBtn").textContent=btn;
+  alertAction=action||null; $("alert").hidden=false;
+}
+function hideAlert(){ $("alert").hidden=true; alertAction=null; }
+$("alertBtn").onclick=()=>{ if(alertAction) alertAction(); };
+
+// Boutons moteurs
+function selectEngine(k){
+  S.engine=k; store.set("engine",k);
+  document.querySelectorAll("#cars button,#engines button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.k===k)));
+  S.gear=0; S.rpm=ENGINES[k].electric?0:ENGINES[k].idle; applyProfile();
+  refreshRecUI(); loadRecs();
+}
+Object.entries(ENGINES).forEach(([k,P])=>{
+  const b=document.createElement("button"); b.type="button"; b.className="sel"; b.id="eng-"+k; b.dataset.k=k;
+  b.textContent=P.name;
+  if(P.arch){ const sm=document.createElement("small"); sm.textContent=P.arch; b.appendChild(sm); }
+  b.setAttribute("aria-pressed",String(k===S.engine));
+  b.onclick=()=>selectEngine(k);
+  $(P.real?"cars":"engines").appendChild(b);
+});
+
+// Mode En roulant / Essai
+function setMode(m){
+  S.mode=m;
+  $("modeGps").setAttribute("aria-pressed",String(m==="gps"));
+  $("modeTest").setAttribute("aria-pressed",String(m==="test"));
+  $("brakeBtn").disabled = m==="gps";
+  $("modeHint").textContent = m==="gps"
+    ? "Le régime suit ta vitesse réelle. À l'arrêt, maintiens Gaz pour faire monter les tours."
+    : "Maintiens Gaz pour accélérer et Frein pour ralentir. Au clavier : flèches haut et bas.";
+  S.speed=0; S.accel=0; S.gear=0;
+  if(m==="gps" && S.running) startGps(); else stopGps();
+}
+$("modeGps").onclick=()=>setMode("gps");
+$("modeTest").onclick=()=>setMode("test");
+
+// Pédales : maintien au doigt ou à la souris, relâchées si le doigt glisse ou la page perd le focus
+function press(key,on){
+  S[key]=on; $(key==="gas"?"gasBtn":"brakeBtn").setAttribute("aria-pressed",String(on));
+}
+function bindPedal(el,key){
+  el.addEventListener("pointerdown",e=>{ e.preventDefault(); if(el.disabled) return; press(key,true); try{ el.setPointerCapture(e.pointerId); }catch(_){} });
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev=>el.addEventListener(ev,()=>press(key,false)));
+  el.addEventListener("contextmenu",e=>e.preventDefault());
+  el.addEventListener("click",e=>e.preventDefault());
+}
+bindPedal($("gasBtn"),"gas"); bindPedal($("brakeBtn"),"brake");
+addEventListener("blur",()=>{ press("gas",false); press("brake",false); });
+// Clavier : flèches seulement (Espace et Entrée gardent leur rôle sur les boutons)
+const typing=e=>/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+addEventListener("keydown",e=>{
+  if(typing(e)) return;
+  if(e.key==="ArrowUp"){ press("gas",true); e.preventDefault(); }
+  if(e.key==="ArrowDown" && S.mode==="test"){ press("brake",true); e.preventDefault(); }
+});
+addEventListener("keyup",e=>{
+  if(e.key==="ArrowUp") press("gas",false);
+  if(e.key==="ArrowDown") press("brake",false);
+});
+
+// Volume
+function setVol(v){
+  v=Math.max(0,Math.min(100,Math.round(v)||0));
+  S.vol=v; $("vol").value=v; $("volOut").textContent=v; store.set("vol",v);
+  $("vol").setAttribute("aria-valuetext",v+" sur 100");
+  if(ctx && S.running) N.master.gain.setTargetAtTime((v/100)**1.5*.9,ctx.currentTime,.05);
+}
+$("vol").addEventListener("input",e=>setVol(+e.target.value));
+
+// Empêche l'écran de se mettre en veille pendant que le moteur tourne
+let wake=null;
+async function keepAwake(){ try{ if(!wake || wake.released) wake = await navigator.wakeLock?.request("screen"); }catch(e){} }
+
+/* =========================================================
+   Vrais enregistrements : stockés dans le navigateur (IndexedDB), relus à chaque démarrage
+   ========================================================= */
+const IDB={
+  db:null,
+  async open(){
+    if(this.db) return this.db;
+    this.db=await new Promise((res,rej)=>{ const r=indexedDB.open("vroum",1);
+      r.onupgradeneeded=()=>r.result.createObjectStore("rec"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+    return this.db;
+  },
+  async tx(mode,fn){
+    const db=await this.open();
+    return new Promise((res,rej)=>{ const t=db.transaction("rec",mode), q=fn(t.objectStore("rec"));
+      t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error); });
+  },
+  get(k){ return this.tx("readonly",s=>s.get(k)).catch(()=>null); },
+  put(k,v){ return this.tx("readwrite",s=>s.put(v,k)).then(()=>true).catch(()=>false); },
+  del(k){ return this.tx("readwrite",s=>s.delete(k)).catch(()=>null); }
+};
+const SLOTS={low:{file:"recLow",rpm:"rpmLow",name:"nameLow"}, high:{file:"recHigh",rpm:"rpmHigh",name:"nameHigh"}};
+const defRpm=slot=>{ const P=ENGINES[S.engine];
+  return slot==="low" ? (P.electric?3000:P.idle) : (P.electric?12000:Math.round(P.redline*.6/100)*100); };
+const clampRpm=(v,slot)=>{ v=Math.round(+v); return v>=300&&v<=20000 ? v : defRpm(slot); };
+const recCache={};   // enregistrements déjà décodés
+
+// Rend la boucle sans clic : la fin est fondue dans le début
+function makeLoop(buf){
+  const fade=Math.min(Math.floor(buf.sampleRate*.25),Math.floor(buf.length/4)), len=buf.length-fade;
+  const out=ctx.createBuffer(buf.numberOfChannels,len,buf.sampleRate);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){
+    const a=buf.getChannelData(ch), o=out.getChannelData(ch);
+    for(let i=0;i<len;i++){
+      if(i<fade){ const x=i/fade; o[i]=a[i]*Math.sqrt(x)+a[len+i]*Math.sqrt(1-x); }
+      else o[i]=a[i];
+    }
+  }
+  return out;
+}
+
+function setName(slot,text,state){ const el=$(SLOTS[slot].name); el.textContent=text; el.className="fname"+(state?" "+state:""); }
+async function refreshRecUI(){
+  $("recEngine").textContent=ENGINES[S.engine].name;
+  let n=0;
+  for(const slot in SLOTS){
+    const rec=await IDB.get(S.engine+"."+slot);
+    $(SLOTS[slot].rpm).value = rec ? rec.rpm : defRpm(slot);
+    setName(slot, rec ? rec.name : "aucun fichier", rec?"on":"");
+    if(rec) n++;
+  }
+  $("recCount").textContent = n ? (n===1?"1 chargé":"2 chargés") : "aucun";
+  $("recCount").className = "count"+(n?" on":"");
+  const P=ENGINES[S.engine], loaded=N.real&&N.real.key===S.engine;
+  $("srcHint").textContent = n ? "Tes enregistrements ("+n+")" : P.real ? (loaded||!ctx ? "Vrais enregistrements de la voiture" : "Chargement des sons…") : "Son de synthèse";
+  $("srcHint").className = "src"+(n||P.real?" real":"");
+  $("recClear").disabled = !n;
+}
+
+// (Re)lance la lecture en boucle des enregistrements du moteur choisi
+let recGen=0;
+async function loadRecs(){
+  if(!ctx||!N.rec) return;
+  const gen=++recGen;                                      // ignore un chargement devenu obsolète (changement de moteur rapide)
+  for(const slot in N.rec){ try{ N.rec[slot].src.stop(); }catch(e){} N.rec[slot].g.disconnect(); }
+  N.rec={};
+  const engine=S.engine;
+  for(const slot in SLOTS){
+    const key=engine+"."+slot, rec=await IDB.get(key);
+    if(!rec) continue;
+    try{
+      let c=recCache[key];
+      if(!c || c.t!==rec.t){
+        const raw=await ctx.decodeAudioData(await rec.blob.arrayBuffer());
+        if(raw.duration<1) throw new Error("trop court");
+        c={t:rec.t, buf:makeLoop(raw)}; recCache[key]=c;
+      }
+      if(gen!==recGen) return;
+      const src=ctx.createBufferSource(), g=ctx.createGain(); g.gain.value=0;
+      src.buffer=c.buf; src.loop=true; src.connect(g).connect(N.recLP);
+      src.start(0,Math.random()*c.buf.duration*.5);
+      N.rec[slot]={src,g,rpm:rec.rpm};
+    }catch(e){
+      setName(slot, e&&e.message==="trop court" ? "trop court (1 s minimum)" : "format illisible, essaie un MP3 ou un WAV", "err");
+    }
+  }
+}
+
+Object.entries(SLOTS).forEach(([slot,e])=>{
+  $(e.file).addEventListener("change",async ev=>{
+    const f=ev.target.files[0]; ev.target.value="";
+    if(!f) return;
+    if(f.size>40*1024*1024){ setName(slot,"fichier trop lourd (40 Mo max)","err"); return; }
+    const rpm=clampRpm($(e.rpm).value,slot);
+    setName(slot,"chargement…","");
+    const ok=await IDB.put(S.engine+"."+slot,{blob:f,name:f.name,rpm,t:Date.now()});
+    if(!ok){ setName(slot,"impossible d'enregistrer dans le navigateur","err"); return; }
+    await refreshRecUI(); await loadRecs();
+  });
+  $(e.rpm).addEventListener("change",async()=>{
+    const v=clampRpm($(e.rpm).value,slot); $(e.rpm).value=v;
+    const key=S.engine+"."+slot, rec=await IDB.get(key);
+    if(!rec) return;
+    rec.rpm=v; await IDB.put(key,rec);
+    if(N.rec&&N.rec[slot]) N.rec[slot].rpm=v;
+  });
+});
+$("recClear").onclick=async()=>{
+  for(const slot in SLOTS){ await IDB.del(S.engine+"."+slot); delete recCache[S.engine+"."+slot]; }
+  await refreshRecUI(); await loadRecs();
+};
+
+// Démarrer / couper
+let starting=false;
+$("startBtn").onclick=async()=>{
+  if(starting) return;
+  const btn=$("startBtn");
+  if(!S.running){
+    starting=true; btn.disabled=true; btn.textContent="Démarrage…";
+    try{
+      if(!ctx){ await buildAudio(); await loadRecs(); }
+      await ctx.resume();
+    }catch(e){
+      starting=false; btn.disabled=false; btn.textContent="Démarrer le moteur";
+      setAudio("err","Son indisponible"); showAlert("Le navigateur a refusé de lancer le son. Recharge la page et réessaie.");
+      return;
+    }
+    const P=ENGINES[S.engine];
+    S.running=true; S.rpm=P.electric?0:P.idle*1.6;       // petit coup de démarreur
+    if(!reduceMotion) NEEDLE.sweep=1.1;                    // balayage de l'aiguille, comme un vrai combiné
+    setVol(S.vol);
+    starting=false; btn.disabled=false; btn.textContent="Couper le moteur"; btn.classList.add("on");
+    setAudio("ok","Moteur en marche");
+    if(S.mode==="gps") startGps();
+    keepAwake();
+  } else {
+    S.running=false;
+    N.master.gain.setTargetAtTime(0,ctx.currentTime,.08);
+    setTimeout(()=>{ if(!S.running) ctx.suspend(); },400);
+    btn.textContent="Démarrer le moteur"; btn.classList.remove("on");
+    setAudio("","Moteur coupé"); hideAlert();
+    stopGps();
+    try{ wake?.release(); }catch(e){} wake=null;
+  }
+};
+
+// Retour au premier plan : relance audio + verrou d'écran
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible" && S.running){ ctx.resume(); keepAwake(); }
+});
+
+addEventListener("resize",sizeCanvas);
+readTokens();
+document.fonts && document.fonts.ready.then(readTokens);
+setVol(S.vol); setMode("gps"); sizeCanvas(); refreshRecUI();
+if(!window.isSecureContext) showAlert("Cette page n'est pas en https://, donc le GPS est bloqué. Le mode Essai marche quand même.");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
