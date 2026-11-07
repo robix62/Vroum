@@ -84,9 +84,14 @@ button:disabled{opacity:.4;cursor:default}
 .seg .ic{width:18px;height:18px}
 .chips{grid-template-columns:repeat(2,minmax(0,1fr))}
 .chips button{position:relative;overflow:hidden;text-align:left;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;line-height:1.2;min-height:68px;padding:12px 14px}
-.chips button .nm{font:700 17px var(--f-body)}
-.chips button small{grid-column:1}
-.chips button .st{grid-column:2;grid-row:1 / span 2;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.chips button{padding:0 14px 12px;align-content:start}
+.chips button .ph{grid-column:1/-1;grid-row:1;width:calc(100% + 28px);margin:0 -14px 8px;aspect-ratio:16/8;object-fit:cover;display:block;background:var(--sunk);border-bottom:1px solid var(--line)}
+.chips button .ph.none{display:flex;align-items:center;justify-content:center;font:700 26px var(--f-display);letter-spacing:.08em;color:var(--muted);
+  background:linear-gradient(135deg,var(--sunk),var(--panel))}
+.chips button[aria-pressed="true"] .ph{border-bottom-color:var(--amber)}
+.chips button .nm{font:700 17px var(--f-body);grid-column:1;grid-row:2}
+.chips button small{grid-column:1;grid-row:3}
+.chips button .st{grid-column:2;grid-row:2 / span 2;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 .chips button[data-ready] .st{color:var(--green)}
 .chips button::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0) * 100%);background:var(--amber);transition:width .2s ease-out}
 .chips button[data-ready]::after{opacity:0;transition:opacity .4s}
@@ -213,7 +218,7 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
       </div>
       <button type="button" id="recClear">Supprimer les enregistrements de ce moteur</button>
     </details>
-    <p class="credits">Sons réels : <a href="https://github.com/markeasting/engine-audio" target="_blank" rel="noopener">markeasting/engine-audio</a> (licence MIT) · Streiter V12 du jeu Street Shift, via <a href="https://github.com/ATG-Simulator/VehicleNoiseSynthesizer" target="_blank" rel="noopener">ATG Vehicle Noise Synthesizer</a> (licence MIT).</p>
+    <p class="credits">Sons réels : <a href="https://github.com/markeasting/engine-audio" target="_blank" rel="noopener">markeasting/engine-audio</a> (licence MIT) · Streiter V12 du jeu Street Shift, via <a href="https://github.com/ATG-Simulator/VehicleNoiseSynthesizer" target="_blank" rel="noopener">ATG Vehicle Noise Synthesizer</a> (licence MIT).<br>Photos via Wikimedia Commons : <a href="https://commons.wikimedia.org/wiki/File:2011_Ferrari_458_Italia_3.jpg" target="_blank" rel="noopener">Ferrari 458</a> et <a href="https://commons.wikimedia.org/wiki/File:1979_BMW_M1_Procar.jpg" target="_blank" rel="noopener">BMW M1 Procar</a> par Calreyn88 (CC BY-SA 4.0), <a href="https://commons.wikimedia.org/wiki/File:BAC_Mono_(8606487117)_b.jpg" target="_blank" rel="noopener">BAC Mono</a> par Axion23 (CC BY 2.0).</p>
   </section>
 </div>
 
@@ -238,19 +243,22 @@ const ENGINES = {
                      hauteur décalée de pitch cents par tr/min autour du régime de chaque boucle
      type "multi"  : une boucle par régime (moteur + échappement), on joue les deux plus proches et on ajuste la hauteur
      vol : gain de chaque boucle, mesuré pour que toutes les voitures sonnent au même niveau */
-  f458: {name:"Ferrari 458", arch:"V8 4.5 atmo", idle:1000, redline:9000, gears:[8.3,11.9,15.7,20,24.4,29.8,36], pops:true,
+  f458: {name:"Ferrari 458", arch:"V8 4.5 atmo",
+         photo:{src:"https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/2011_Ferrari_458_Italia_3.jpg/960px-2011_Ferrari_458_Italia_3.jpg", page:"https://commons.wikimedia.org/wiki/File:2011_Ferrari_458_Italia_3.jpg", by:"Calreyn88", lic:"CC BY-SA 4.0"}, idle:1000, redline:9000, gears:[8.3,11.9,15.7,20,24.4,29.8,36], pops:true,
          real:{type:"layers", dir:"audio/458/", xfade:[3000,6500], pitch:.2,
                layers:{on_low:{rpm:5300,vol:1.33}, on_high:{rpm:7700,vol:1.43}, off_low:{rpm:6900,vol:.6}, off_high:{rpm:7900,vol:.71}},
                limiter:{file:"limiter",vol:1.06}}},
-  procar:{name:"BMW M1 Procar", arch:"6 en ligne 3.5 atmo", idle:1000, redline:9000, gears:[9,13.5,18.5,23.5,29], pops:true,
+  procar:{name:"BMW M1 Procar", arch:"6 en ligne 3.5 atmo",
+         photo:{src:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/1979_BMW_M1_Procar.jpg/960px-1979_BMW_M1_Procar.jpg", page:"https://commons.wikimedia.org/wiki/File:1979_BMW_M1_Procar.jpg", by:"Calreyn88", lic:"CC BY-SA 4.0"}, idle:1000, redline:9000, gears:[9,13.5,18.5,23.5,29], pops:true,
          real:{type:"layers", dir:"audio/procar/", xfade:[3000,6500], pitch:.2,
                layers:{on_low:{rpm:3200,vol:1.27}, on_high:{rpm:8000,vol:.76}, off_low:{rpm:3400,vol:2}, off_high:{rpm:8430,vol:.81}},
                limiter:{file:"../bac/limiter",vol:.4}}},
-  bac:  {name:"BAC Mono", arch:"4 cyl. 2.5 atmo", idle:1000, redline:9000, gears:[8,11.5,15,19,23.5,28.5], pops:true,
+  bac:  {name:"BAC Mono", arch:"4 cyl. 2.5 atmo",
+         photo:{src:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/BAC_Mono_%288606487117%29_b.jpg/960px-BAC_Mono_%288606487117%29_b.jpg", page:"https://commons.wikimedia.org/wiki/File:BAC_Mono_(8606487117)_b.jpg", by:"Axion23", lic:"CC BY 2.0"}, idle:1000, redline:9000, gears:[8,11.5,15,19,23.5,28.5], pops:true,
          real:{type:"layers", dir:"audio/bac/", xfade:[3000,6500], pitch:.2,
                layers:{on_low:{rpm:1000,vol:.42}, on_high:{rpm:1000,vol:.335}, off_low:{rpm:1000,vol:.25}, off_high:{rpm:1000,vol:.21}},
                limiter:{file:"limiter",vol:.4}}},
-  sv12: {name:"Streiter V12", arch:"V12, 32 boucles", idle:1150, redline:8800, gears:[9,14,19.5,25,31,37], pops:true,
+  sv12: {name:"Streiter V12", arch:"V12 · voiture de jeu", idle:1150, redline:8800, gears:[9,14,19.5,25,31,37], pops:true,
          real:{type:"multi", dir:"audio/v12/",
                sets:{eng:{rpms:[1169,1520,2080,2632,3169,3752,4403,4978,5365,5768,6284,6822,7347,7880,8752], vol:.41},
                      exh:{rpms:[1144,2258,2708,3298,3848,4498,4858,5443,5934,6422,6876,7519,8116,8909], vol:.71}}}}
@@ -862,6 +870,14 @@ function selectEngine(k){
 }
 Object.entries(ENGINES).forEach(([k,P])=>{
   const b=document.createElement("button"); b.type="button"; b.className="sel"; b.id="eng-"+k; b.dataset.k=k;
+  if(P.photo){
+    const im=document.createElement("img"); im.className="ph"; im.src=P.photo.src; im.alt="";
+    im.loading="lazy"; im.decoding="async"; im.referrerPolicy="no-referrer";
+    im.onerror=()=>{ im.replaceWith(Object.assign(document.createElement("span"),{className:"ph none",textContent:P.name})); };
+    b.appendChild(im);
+  } else {
+    b.appendChild(Object.assign(document.createElement("span"),{className:"ph none",textContent:"V12"}));   // voiture fictive : pas de photo réelle
+  }
   const nm=document.createElement("span"); nm.className="nm"; nm.textContent=P.name; b.appendChild(nm);
   const st=document.createElement("span"); st.className="st"; st.id="st-"+k; b.appendChild(st);
   if(P.arch){ const sm=document.createElement("small"); sm.textContent=P.arch; b.appendChild(sm); }
