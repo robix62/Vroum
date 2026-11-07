@@ -35,7 +35,7 @@ Vroum is a self-owned and self-hosted tool, with no subscription, no account and
 
 ## Capabilities and Constraints
 
-- **Engines (combustion only):** American V8 (cross-plane), Italian V8 (flat-plane), V10, V12 GT, flat-six (naturally aspirated), inline-six, turbo inline-five, turbo flat-four, turbo inline-four, two-rotor rotary. The electric profile was removed at the owner's request.
+- **Cars (real recordings only, synthesis removed at the owner's request):** Ferrari 458 (V8), BMW M1 Procar (inline-six), BAC Mono (inline-four), Streiter V12 (multi-RPM set). Sounds come from MIT-licensed repositories: markeasting/engine-audio and ATG Vehicle Noise Synthesizer.
 - **Synthesis model:**
   - Engine-order additive synthesis, with orders specific to each architecture, slow per-order fluctuation and intake noise.
   - Blended with a per-cylinder exhaust-pulse texture that follows the real firing order and bank split.

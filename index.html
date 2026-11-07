@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700&family=Syncopate:wght@700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout : cadran à gauche, commandes à droite (empilés sur téléphone).
    Ce qui sert en roulant (démarrer, moteur, volume) est en haut ; le réglage des enregistrements est replié.
@@ -25,6 +25,7 @@
   --red-soft:#ef5a5f1f;
   --green:#4cc38a;     /* état OK */
   --f-digit:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-display:"Syncopate","Saira Condensed","Arial Narrow",sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r:12px;
   color-scheme:dark;
@@ -44,7 +45,7 @@ body{
 .app{max-width:1440px;margin:0 auto;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));display:grid;
   grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:16px 28px;min-height:100%}
 header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-h1{font:700 32px/1 var(--f-digit);letter-spacing:.08em;text-transform:uppercase;margin:0}
+h1{font:700 26px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:0}
 h1 span{color:var(--amber)}
 
 /* Cadran + état */
@@ -78,7 +79,18 @@ button:disabled{opacity:.4;cursor:default}
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
 .seg button{border-color:transparent;min-height:46px;padding:8px 18px}
 .chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-.chips button{text-align:left;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;line-height:1.2}
+.ic{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.seg button{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.seg .ic{width:18px;height:18px}
+.chips{grid-template-columns:repeat(2,minmax(0,1fr))}
+.chips button{position:relative;overflow:hidden;text-align:left;display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;line-height:1.2;min-height:68px;padding:12px 14px}
+.chips button .nm{font:700 17px var(--f-body)}
+.chips button small{grid-column:1}
+.chips button .st{grid-column:2;grid-row:1 / span 2;font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.chips button[data-ready] .st{color:var(--green)}
+.chips button::after{content:"";position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0) * 100%);background:var(--amber);transition:width .2s ease-out}
+.chips button[data-ready]::after{opacity:0;transition:opacity .4s}
+.chips button:active:not(:disabled){background:var(--amber-soft)}
 .chips button small{font-size:13px;font-weight:500;color:var(--muted)}
 .chips button[aria-pressed="true"] small{color:inherit;opacity:.8}
 .group{font-size:14px;font-weight:600;color:var(--fg)}
@@ -87,7 +99,9 @@ button:disabled{opacity:.4;cursor:default}
 .src{font-size:14px;color:var(--muted);margin:0}
 .src.real{color:var(--green)}
 
-.start{font:700 24px var(--f-digit);letter-spacing:.14em;text-transform:uppercase;min-height:80px;border:2px solid var(--amber);color:var(--amber)}
+.start{font:700 19px var(--f-display);letter-spacing:.06em;text-transform:uppercase;min-height:84px;border:2px solid var(--amber);color:var(--amber);
+  display:flex;align-items:center;justify-content:center;gap:14px}
+.start .ic{width:28px;height:28px;stroke-width:2.4}
 .start.on{background:var(--amber);color:var(--bg)}
 .start.on:active{background:#d98f2e}
 
@@ -96,7 +110,8 @@ button:disabled{opacity:.4;cursor:default}
 .pedal.gas[aria-pressed="true"]{background:var(--amber);color:var(--bg);border-color:var(--amber)}
 .pedal.brake[aria-pressed="true"]{background:var(--red);color:var(--bg);border-color:var(--red)}
 .hint{font-size:14px;color:var(--muted);margin:0;max-width:62ch}
-.vol{display:flex;align-items:center;gap:14px}
+.vol{display:grid;grid-template-columns:auto 52px minmax(0,1fr) 52px 3ch;align-items:center;gap:10px}
+.vol .step{min-height:52px;padding:0;display:flex;align-items:center;justify-content:center}
 input[type=range]{flex:1;min-width:0;accent-color:var(--amber);height:44px;margin:0}
 .vol output{font:700 22px var(--f-digit);min-width:3ch;text-align:right;font-variant-numeric:tabular-nums}
 
@@ -125,6 +140,9 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
   .app{grid-template-columns:minmax(0,1fr)}
   canvas{max-width:440px}
 }
+@media (max-width:520px){
+  .vol{grid-template-columns:52px minmax(0,1fr) 52px auto}.vol .label{grid-column:1/-1}
+}
 @media (max-width:480px){
   .rec{grid-template-columns:9em 6.5em auto}.fname{grid-column:1/-1}
   .pedal{min-height:100px}
@@ -137,8 +155,8 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
   <header>
     <h1>Vro<span>u</span>m</h1>
     <div class="seg" role="group" aria-label="Mode">
-      <button type="button" class="sel" id="modeGps" aria-pressed="true">En roulant</button>
-      <button type="button" class="sel" id="modeTest" aria-pressed="false">Essai</button>
+      <button type="button" class="sel" id="modeGps" aria-pressed="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>En roulant</button>
+      <button type="button" class="sel" id="modeTest" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h6"/></svg>Essai</button>
     </div>
   </header>
 
@@ -155,16 +173,12 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
   </section>
 
   <section class="controls" aria-label="Commandes">
-    <button id="startBtn" class="start" type="button">Démarrer le moteur</button>
+    <button id="startBtn" class="start" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg><span id="startLabel">Démarrer le moteur</span></button>
 
     <fieldset class="block">
       <legend class="label">Voiture</legend>
-      <div class="group">Sons réels</div>
       <div class="chips" id="cars"></div>
-      <div class="group">Synthèse</div>
-      <div class="chips" id="engines"></div>
       <p class="src" id="srcHint">Son de synthèse</p>
-      <p class="credits">Sons réels : <a href="https://github.com/markeasting/engine-audio" target="_blank" rel="noopener">markeasting/engine-audio</a> (licence MIT) · Streiter V12 du jeu Street Shift, via <a href="https://github.com/ATG-Simulator/VehicleNoiseSynthesizer" target="_blank" rel="noopener">ATG Vehicle Noise Synthesizer</a> (licence MIT).</p>
     </fieldset>
 
     <div class="block">
@@ -175,14 +189,16 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
       <p class="hint" id="modeHint"></p>
       <div class="vol">
         <label class="label" for="vol">Volume</label>
+        <button type="button" class="step" id="volDown" aria-label="Baisser le volume"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
         <input type="range" id="vol" min="0" max="100" value="70">
+        <button type="button" class="step" id="volUp" aria-label="Monter le volume"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
         <output id="volOut" for="vol">70</output>
       </div>
     </div>
 
     <details class="block" id="recBlock">
-      <summary><span class="sum">Vrais enregistrements · <span id="recEngine">V8 américain</span></span><span class="count" id="recCount">aucun</span></summary>
-      <p class="hint">Un enregistrement de ce moteur à régime stable, 5 à 10 secondes sans passage de rapport, avec le régime auquel il a été pris. Il remplace la synthèse et suit ton régime. Avec deux enregistrements, le son glisse de l'un à l'autre en montant dans les tours.</p>
+      <summary><span class="sum">Tes enregistrements · <span id="recEngine">V8 américain</span></span><span class="count" id="recCount">aucun</span></summary>
+      <p class="hint">Un enregistrement de ce moteur à régime stable, 5 à 10 secondes sans passage de rapport, avec le régime auquel il a été pris. Il remplace le son fourni pour cette voiture et suit ton régime. Avec deux enregistrements, le son glisse de l'un à l'autre en montant dans les tours.</p>
       <div class="rec">
         <label class="file">Bas régime<input type="file" id="recLow" accept="audio/*"></label>
         <input type="number" id="rpmLow" inputmode="numeric" min="300" max="20000" step="50" required aria-label="Régime de l'enregistrement bas régime">
@@ -197,6 +213,7 @@ details[open] summary::after{transform:rotate(225deg) translate(-3px,-3px)}
       </div>
       <button type="button" id="recClear">Supprimer les enregistrements de ce moteur</button>
     </details>
+    <p class="credits">Sons réels : <a href="https://github.com/markeasting/engine-audio" target="_blank" rel="noopener">markeasting/engine-audio</a> (licence MIT) · Streiter V12 du jeu Street Shift, via <a href="https://github.com/ATG-Simulator/VehicleNoiseSynthesizer" target="_blank" rel="noopener">ATG Vehicle Noise Synthesizer</a> (licence MIT).</p>
   </section>
 </div>
 
@@ -236,74 +253,7 @@ const ENGINES = {
   sv12: {name:"Streiter V12", arch:"V12, 32 boucles", idle:1150, redline:8800, gears:[9,14,19.5,25,31,37], pops:true,
          real:{type:"multi", dir:"audio/v12/",
                sets:{eng:{rpms:[1169,1520,2080,2632,3169,3752,4403,4978,5365,5768,6284,6822,7347,7880,8752], vol:.41},
-                     exh:{rpms:[1144,2258,2708,3298,3848,4498,4858,5443,5934,6422,6876,7519,8116,8909], vol:.71}}}},
-  /* ---------- Synthèse ---------- */
-  v8:  {name:"V8 américain", cyl:8, idle:700, redline:6500, gears:[12,20,29,38,48,60],
-        orders:[[.5,.3,.1],[1,.35,.15],[1.5,.32,.12],[2,.6,.4],[2.5,.22,.1],[3,.25,.15],[4,1,1],[6,.12,.25],[8,.22,.45],[12,.04,.15]],
-        rough:.5, tgain:.12, mixP:.45,
-        order:[0,1,1,0,1,0,0,1], width:.32, attack:9, decay:3.2, rasp:.06, jitter:.22, intake:.05, imbalance:.28, gain:.6,
-        pipe:9, fb:.22, peaks:[[65,9,.9],[380,-3,1],[1800,-9,.8]], drive:1.6,
-        cutBase:170, cutRange:1500, cutLoad:800, pops:true},
-  v12: {name:"V12 GT", cyl:12, idle:950, redline:8500, gears:[11,18,26,34,42,52],
-        orders:[[1.5,.08,.02],[3,.4,.28],[4.5,.07,.05],[6,1,1],[9,.18,.35],[12,.28,.75],[15,.04,.12],[18,.07,.3],[24,.02,.14]],
-        rough:.22, tgain:.13, mixP:.12,
-        order:[0,1,0,1,0,1,0,1,0,1,0,1], width:.24, attack:13, decay:4.2, rasp:.1, jitter:.05, intake:.1, imbalance:.07, gain:.5,
-        pipe:6, fb:.2, peaks:[[110,5,.9],[1200,3,1],[4500,-3,.8]], drive:1.3,
-        cutBase:320, cutRange:5200, cutLoad:1600, pops:true},
-  f6:  {name:"Flat-six atmo", cyl:6, idle:950, redline:9000, gears:[9,15,21,27,33,39],
-        orders:[[.5,.1,.03],[1.5,.3,.2],[3,1,1],[4.5,.35,.4],[6,.45,.7],[9,.25,.5],[12,.12,.35]],
-        rough:.35, tgain:.13, mixP:.3,
-        order:[0,1,0,1,0,1], width:.28, attack:13, decay:4.6, rasp:.14, jitter:.1, intake:.1, imbalance:.13, gain:.6,
-        pipe:5, fb:.25, peaks:[[90,5,.9],[900,4,1.2],[3500,-3,.8]], drive:1.7,
-        cutBase:240, cutRange:3800, cutLoad:1200, pops:true},
-  i4:  {name:"4 cyl. turbo", cyl:4, idle:850, redline:7000, gears:[8,14,20,27,34,41],
-        orders:[[1,.15,.05],[2,1,1],[3,.1,.05],[4,.45,.5],[6,.15,.2],[8,.1,.15]],
-        rough:.3, tgain:.14, mixP:.3,
-        order:[2,2,2,2], width:.34, attack:9, decay:3.6, rasp:.07, jitter:.12, intake:.14, imbalance:.16, gain:.7,
-        pipe:7, fb:.2, peaks:[[80,7,.9],[480,-2,1],[2000,-7,.8]], drive:1.7,
-        cutBase:190, cutRange:1900, cutLoad:900, pops:true, turbo:true},
-  v8f: {name:"V8 italien", cyl:8, idle:1000, redline:8500, gears:[9.5,15,21,27,33,40],
-        // Vilebrequin plat : allumages alternés entre rangées, pas de demi-ordres -> son aigu et rageur
-        orders:[[2,.5,.4],[4,1,1],[6,.15,.25],[8,.35,.7],[12,.12,.3],[16,.05,.15]],
-        rough:.25, tgain:.13, mixP:.2,
-        order:[0,1,0,1,0,1,0,1], width:.24, attack:13, decay:4.4, rasp:.2, jitter:.06, intake:.12, imbalance:.08, gain:.55,
-        pipe:5, fb:.24, peaks:[[100,5,.9],[1100,4,1.1],[3800,-3,.8]], drive:1.6,
-        cutBase:280, cutRange:4600, cutLoad:1500, pops:true},
-  v10: {name:"V10 atmo", cyl:10, idle:1000, redline:8700, gears:[9,15,21,27,33,40],
-        // Ordre 5 dominant + ordre 10 qui monte : hurlement typique des V10 de course
-        orders:[[1,.1,.03],[2.5,.22,.15],[5,1,1],[7.5,.2,.35],[10,.35,.75],[15,.1,.3],[20,.04,.15]],
-        rough:.3, tgain:.13, mixP:.2,
-        order:[0,1,0,1,0,1,0,1,0,1], width:.22, attack:13, decay:4.4, rasp:.2, jitter:.06, intake:.12, imbalance:.08, gain:.5,
-        pipe:5, fb:.22, peaks:[[105,5,.9],[1300,4,1.1],[4200,-2,.8]], drive:1.5,
-        cutBase:300, cutRange:5000, cutLoad:1500, pops:true},
-  i6:  {name:"6 en ligne", cyl:6, idle:750, redline:7500, gears:[10,16,23,30,37,45],
-        // Ordre 3 très lisse (équilibre parfait du 6 en ligne), ordre 6 soyeux en haut
-        orders:[[1.5,.1,.04],[3,1,1],[4.5,.15,.15],[6,.5,.7],[9,.25,.45],[12,.12,.3]],
-        rough:.2, tgain:.13, mixP:.15,
-        order:[0,1,0,1,0,1], width:.26, attack:12, decay:4.2, rasp:.1, jitter:.05, intake:.1, imbalance:.06, gain:.55,
-        pipe:6, fb:.22, peaks:[[90,6,.9],[800,3,1],[3000,-5,.8]], drive:1.5,
-        cutBase:230, cutRange:3200, cutLoad:1100, pops:true},
-  i5:  {name:"5 cyl. turbo", cyl:5, idle:850, redline:7000, gears:[9,15,21,28,35,42],
-        // Ordre 2,5 + demi-ordres : le "warble" si particulier des 5 cylindres
-        orders:[[.5,.15,.06],[1,.2,.1],[1.5,.2,.1],[2.5,1,1],[3.5,.1,.08],[5,.5,.7],[7.5,.25,.4]],
-        rough:.35, tgain:.13, mixP:.3,
-        order:[2,2,2,2,2], width:.3, attack:10, decay:3.8, rasp:.12, jitter:.12, intake:.14, imbalance:.15, gain:.65,
-        pipe:7, fb:.24, peaks:[[85,6,.9],[650,3,1],[2400,-5,.8]], drive:1.8,
-        cutBase:210, cutRange:2400, cutLoad:1000, pops:true, turbo:true},
-  b4:  {name:"Flat-4 turbo", cyl:4, idle:800, redline:7000, gears:[8.5,14.5,20.5,27,33,40],
-        // Collecteurs de longueurs inégales : deux allumages rapprochés par rangée -> grondement à demi-ordres
-        orders:[[.5,.35,.15],[1,.4,.2],[1.5,.25,.1],[2,1,1],[3,.12,.1],[4,.4,.5],[6,.1,.2]],
-        rough:.45, tgain:.12, mixP:.45,
-        order:[0,0,1,1], width:.32, attack:9, decay:3.4, rasp:.08, jitter:.18, intake:.12, imbalance:.22, gain:.65,
-        pipe:8, fb:.22, peaks:[[75,8,.9],[420,-2,1],[2000,-7,.8]], drive:1.7,
-        cutBase:190, cutRange:1900, cutLoad:900, pops:true, turbo:true},
-  rot: {name:"Rotatif", cyl:4, idle:1000, redline:9000, gears:[8,13,19,25,31],
-        // Moteur à pistons rotatifs, 2 rotors : impulsions brèves et violentes, ralenti saccadé, "brap" caractéristique
-        orders:[[1,.3,.15],[2,1,1],[3,.25,.3],[4,.5,.7],[6,.3,.5],[8,.2,.4]],
-        rough:.4, tgain:.12, mixP:.5,
-        order:[2,2,2,2], width:.22, attack:16, decay:5, rasp:.4, jitter:.35, intake:.1, imbalance:.1, gain:.7,
-        pipe:4, fb:.3, peaks:[[110,5,.9],[1000,5,1.2],[3200,-2,.8]], drive:2.2,
-        cutBase:300, cutRange:3800, cutLoad:1400, pops:true}
+                     exh:{rpms:[1144,2258,2708,3298,3848,4498,4858,5443,5934,6422,6876,7519,8116,8909], vol:.71}}}}
 };
 
 /* ---------- Préférences (localStorage, facultatif) ---------- */
@@ -490,16 +440,7 @@ async function buildAudio(){
 // Applique le moteur choisi : générateur + ligne d'échappement
 function applyProfile(){
   if(!ctx) return;
-  const P=ENGINES[S.engine].real ? ENGINES.v8 : ENGINES[S.engine];   // la synthèse reste prête mais muette pour une voiture réelle
-  loadReal();
-  N.send({profile:{electric:!!P.electric, order:P.order||[], width:P.width, decay:P.decay, rasp:P.rasp,
-    jitter:P.jitter, intake:P.intake, attack:P.attack, cyl:P.cyl, orders:P.orders||[], rough:P.rough, tgain:P.tgain, mixP:P.mixP, imbalance:P.imbalance, gain:P.gain, redline:P.redline}});
-  N.delay.delayTime.value=P.pipe/1000;
-  N.fb.gain.value=P.fb;
-  P.peaks.forEach(([f,g,q],i)=>{ N.peaks[i].frequency.value=f; N.peaks[i].gain.value=g; N.peaks[i].Q.value=q; });
-  const c=new Float32Array(2048), k=P.drive;
-  for(let i=0;i<c.length;i++){ const x=i/1023.5-1; c[i]=Math.tanh(k*x)/Math.tanh(k); }
-  N.shaper.curve=c;
+  loadReal();                                   // toutes les voitures utilisent de vrais enregistrements
 }
 
 // Pétarade : rafale de bruit grave injectée dans la ligne d'échappement
@@ -554,7 +495,12 @@ async function loadReal(){
     for(const set in R.sets) R.sets[set].rpms.forEach(rpm=>items.push({id:set+rpm, set, url:R.dir+set+"/"+rpm+".flac", rpm, vol:R.sets[set].vol}));
   }
   let done=0;
-  const progress=()=>{ if(gen===realGen && S.engine===key) $("srcHint").textContent=`Chargement des sons… ${done}/${items.length}`; };
+  const chip=$("eng-"+key), st=$("st-"+key);
+  const progress=()=>{
+    const f=done/items.length;
+    if(chip && !chip.hasAttribute("data-ready")){ chip.style.setProperty("--p",f); chip.setAttribute("aria-busy","true"); st.textContent=Math.round(f*100)+" %"; }
+    if(gen===realGen && S.engine===key) $("srcHint").textContent=`Chargement des sons… ${done}/${items.length}`;
+  };
   progress();
   try{
     const bufs=await Promise.all(items.map(it=>fetchBuf(it.url).then(b=>{ done++; progress(); return b; })));
@@ -566,8 +512,10 @@ async function loadReal(){
       return {...it, src, g};
     });
     N.real={key, nodes, byId:Object.fromEntries(nodes.map(n=>[n.id,n]))};
+    if(chip){ chip.setAttribute("data-ready",""); chip.removeAttribute("aria-busy"); st.textContent="prêt"; }
     refreshRecUI();
   }catch(e){
+    if(chip){ chip.removeAttribute("aria-busy"); chip.style.setProperty("--p",0); st.textContent="erreur"; }
     if(gen!==realGen) return;
     $("srcHint").textContent="Sons introuvables";
     showAlert(location.protocol==="file:"
@@ -908,17 +856,18 @@ $("alertBtn").onclick=()=>{ if(alertAction) alertAction(); };
 // Boutons moteurs
 function selectEngine(k){
   S.engine=k; store.set("engine",k);
-  document.querySelectorAll("#cars button,#engines button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.k===k)));
+  document.querySelectorAll("#cars button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.k===k)));
   S.gear=0; S.rpm=ENGINES[k].electric?0:ENGINES[k].idle; applyProfile();
   refreshRecUI(); loadRecs();
 }
 Object.entries(ENGINES).forEach(([k,P])=>{
   const b=document.createElement("button"); b.type="button"; b.className="sel"; b.id="eng-"+k; b.dataset.k=k;
-  b.textContent=P.name;
+  const nm=document.createElement("span"); nm.className="nm"; nm.textContent=P.name; b.appendChild(nm);
+  const st=document.createElement("span"); st.className="st"; st.id="st-"+k; b.appendChild(st);
   if(P.arch){ const sm=document.createElement("small"); sm.textContent=P.arch; b.appendChild(sm); }
   b.setAttribute("aria-pressed",String(k===S.engine));
   b.onclick=()=>selectEngine(k);
-  $(P.real?"cars":"engines").appendChild(b);
+  $("cars").appendChild(b);
 });
 
 // Mode En roulant / Essai
@@ -968,6 +917,8 @@ function setVol(v){
   if(ctx && S.running) N.master.gain.setTargetAtTime((v/100)**1.5*.9,ctx.currentTime,.05);
 }
 $("vol").addEventListener("input",e=>setVol(+e.target.value));
+$("volDown").onclick=()=>setVol(S.vol-10);
+$("volUp").onclick=()=>setVol(S.vol+10);
 
 // Empêche l'écran de se mettre en veille pendant que le moteur tourne
 let wake=null;
@@ -1026,7 +977,7 @@ async function refreshRecUI(){
   $("recCount").textContent = n ? (n===1?"1 chargé":"2 chargés") : "aucun";
   $("recCount").className = "count"+(n?" on":"");
   const P=ENGINES[S.engine], loaded=N.real&&N.real.key===S.engine;
-  $("srcHint").textContent = n ? "Tes enregistrements ("+n+")" : P.real ? (loaded||!ctx ? "Vrais enregistrements de la voiture" : "Chargement des sons…") : "Son de synthèse";
+  $("srcHint").textContent = n ? "Tes enregistrements ("+n+")" : P.real ? (loaded||!ctx ? "Vrais enregistrements de la voiture" : "Chargement des sons…") : "";
   $("srcHint").className = "src"+(n||P.real?" real":"");
   $("recClear").disabled = !n;
 }
@@ -1090,12 +1041,12 @@ $("startBtn").onclick=async()=>{
   if(starting) return;
   const btn=$("startBtn");
   if(!S.running){
-    starting=true; btn.disabled=true; btn.textContent="Démarrage…";
+    starting=true; btn.disabled=true; $("startLabel").textContent="Démarrage…";
     try{
       if(!ctx){ await buildAudio(); await loadRecs(); }
       await ctx.resume();
     }catch(e){
-      starting=false; btn.disabled=false; btn.textContent="Démarrer le moteur";
+      starting=false; btn.disabled=false; $("startLabel").textContent="Démarrer le moteur";
       setAudio("err","Son indisponible"); showAlert("Le navigateur a refusé de lancer le son. Recharge la page et réessaie.");
       return;
     }
@@ -1103,7 +1054,7 @@ $("startBtn").onclick=async()=>{
     S.running=true; S.rpm=P.electric?0:P.idle*1.6;       // petit coup de démarreur
     if(!reduceMotion) NEEDLE.sweep=1.1;                    // balayage de l'aiguille, comme un vrai combiné
     setVol(S.vol);
-    starting=false; btn.disabled=false; btn.textContent="Couper le moteur"; btn.classList.add("on");
+    starting=false; btn.disabled=false; $("startLabel").textContent="Couper le moteur"; btn.classList.add("on");
     setAudio("ok","Moteur en marche");
     if(S.mode==="gps") startGps();
     keepAwake();
@@ -1111,7 +1062,7 @@ $("startBtn").onclick=async()=>{
     S.running=false;
     N.master.gain.setTargetAtTime(0,ctx.currentTime,.08);
     setTimeout(()=>{ if(!S.running) ctx.suspend(); },400);
-    btn.textContent="Démarrer le moteur"; btn.classList.remove("on");
+    $("startLabel").textContent="Démarrer le moteur"; btn.classList.remove("on");
     setAudio("","Moteur coupé"); hideAlert();
     stopGps();
     try{ wake?.release(); }catch(e){} wake=null;

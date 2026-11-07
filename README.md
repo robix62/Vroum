@@ -5,9 +5,8 @@ Bruit de moteur thermique pour la Tesla, sans abonnement. Le régime suit la vit
 Ouvrir dans le navigateur de la voiture : https://robix62.github.io/vroum/
 
 - **Sons réels** : Ferrari 458, BMW M1 Procar, BAC Mono et Streiter V12.
-- **Synthèse** : 10 architectures de moteur.
 - **Mode Essai** : des pédales à l'écran pour tester sans rouler.
-- **Tes propres enregistrements** : à charger par moteur, ils restent dans le navigateur.
+- **Tes propres enregistrements** : à charger par voiture, ils restent dans le navigateur.
 
 ## Crédits des sons
 - [markeasting/engine-audio](https://github.com/markeasting/engine-audio), sous licence MIT : 458, Procar et BAC Mono.
